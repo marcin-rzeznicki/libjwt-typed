@@ -1,0 +1,3 @@
+[submodule "src/cbits/jsmn"]
+	path = src/cbits/jsmn
+	url = https://github.com/zserge/jsmn.git

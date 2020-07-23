@@ -21,11 +21,14 @@ cabal.config
 cabal.project.local
 .ghc.environment.*
 .HTF/
+*.dump-*
 # Stack
 .stack-work/
 stack.yaml.lock
 stack.local.yaml
 stack.local.yaml.lock
+stack.nightly.local.yaml
+stack.nightly.local.yaml.lock
 
 ### IDE/support
 # Vim
