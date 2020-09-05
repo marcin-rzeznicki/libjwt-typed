@@ -175,9 +175,9 @@ checkJwtId jwtId = check "jti" (== Jti (Just jwtId)) jti
 checkClaim
   :: (CanGet n pc, a ~ LookupClaimType n pc)
   => (a -> Bool)
-  -> GrantName n
+  -> ClaimName n
   -> JwtValidation pc any
-checkClaim p n = check (grantNameVal n) p (getGrant n . privateClaims)
+checkClaim p n = check (claimNameVal n) p (getClaim n . privateClaims)
 
 valid :: ValidationNEL ValidationFailure Valid
 valid = Success Valid

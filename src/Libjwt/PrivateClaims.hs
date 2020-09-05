@@ -22,20 +22,20 @@ module Libjwt.PrivateClaims
   ( Claim(..)
   , type (->>)
   , (->>)
-  , GrantWitness
+  , ClaimWitness
   , testify
-  , GrantName(..)
-  , grantNameVal
+  , ClaimName(..)
+  , claimNameVal
   , PrivateClaims
   , pattern (:<)
   , type Empty
   , nullClaims
   , CanAdd
-  , addGrant
+  , addClaim
   , (.:)
   , CanGet
   , LookupClaimType
-  , getGrant
+  , getClaim
   , (.!)
   , Namespace(..)
   , KnownNamespace(..)
@@ -114,17 +114,17 @@ type Empty = ('[] :: [Claim Type])
 nullClaims :: PrivateClaims Empty 'NoNs
 nullClaims = PrivateClaims HashMap.empty
 
-data GrantName (name :: Symbol) = GrantName
+data ClaimName (name :: Symbol) = ClaimName
 
-instance (name ~ name') => IsLabel name (GrantName name') where
-  fromLabel = GrantName
+instance (name ~ name') => IsLabel name (ClaimName name') where
+  fromLabel = ClaimName
 
-grantNameVal :: forall name . KnownSymbol name => GrantName name -> String
-grantNameVal _ = symbolVal (Proxy :: Proxy name)
+claimNameVal :: forall name . KnownSymbol name => ClaimName name -> String
+claimNameVal _ = symbolVal (Proxy :: Proxy name)
 
-newtype GrantWitness (name :: Symbol) a = Witness { testify :: a }
+newtype ClaimWitness (name :: Symbol) a = Witness { testify :: a }
 
-(->>) :: GrantName name -> a -> GrantWitness name a
+(->>) :: ClaimName name -> a -> ClaimWitness name a
 _ ->> a = Witness a
 
 type family UniqueName (name :: Symbol) (ts :: [Claim Type]) :: Bool where
@@ -134,7 +134,7 @@ type family UniqueName (name :: Symbol) (ts :: [Claim Type]) :: Bool where
 
 type family RequireUniqueName (isUnique :: Bool) (name :: Symbol) :: Constraint where
   RequireUniqueName 'True  _  = ()
-  RequireUniqueName 'False n  = TypeError ('Text "Grant " ':<>: 'ShowType n ':<>: 'Text " is not unique in this claim set")
+  RequireUniqueName 'False n  = TypeError ('Text "Claim " ':<>: 'ShowType n ':<>: 'Text " is not unique in this claim set")
 
 type family RestrictedName (name :: Symbol) :: Bool where
   RestrictedName "iss" = 'True
@@ -157,23 +157,23 @@ type family DisallowRestrictedName (isRestricted :: Bool) (name :: Symbol) :: Co
 type family CanAdd n ns :: Constraint where
   CanAdd n ns = (KnownSymbol n, DisallowRestrictedName (RestrictedName n) n, RequireUniqueName (UniqueName n ns) n)
 
-addGrant
+addClaim
   :: forall name a ts ns
    . CanAdd name ts
-  => GrantName name
+  => ClaimName name
   -> a
   -> PrivateClaims ts ns
   -> PrivateClaims (name ->> a : ts) ns
-addGrant _ a (PrivateClaims store) = PrivateClaims
+addClaim _ a (PrivateClaims store) = PrivateClaims
   $ HashMap.insert claimName (Any a) store
   where claimName = symbolVal (Proxy :: Proxy name)
 
 (.:) :: forall name a ts ns
       . CanAdd name ts
-     => GrantWitness name a
+     => ClaimWitness name a
      -> PrivateClaims ts ns
      -> PrivateClaims (name ->> a : ts) ns
-(Witness a) .: pc = addGrant GrantName a pc
+(Witness a) .: pc = addClaim ClaimName a pc
 
 type family NameExists (name :: Symbol) (ts :: [Claim Type]) :: Bool where
   NameExists _ '[]           = 'False
@@ -182,7 +182,7 @@ type family NameExists (name :: Symbol) (ts :: [Claim Type]) :: Bool where
 
 type family RequireExists (exists :: Bool) (name :: Symbol) :: Constraint where
   RequireExists 'True  _ = ()
-  RequireExists 'False n = TypeError ('Text "Grant " ':<>: 'ShowType n ':<>: 'Text " does not exist in this claim set")
+  RequireExists 'False n = TypeError ('Text "Claim " ':<>: 'ShowType n ':<>: 'Text " does not exist in this claim set")
 
 type family CanGet n ns :: Constraint where
   CanGet n ns = (KnownSymbol n, RequireExists (NameExists n ns) n)
@@ -196,23 +196,23 @@ unsafeLookup claimName pc = unAny $ unsafeClaimsMap pc ! claimName
   where
     unAny (Any a) = unsafeCoerce a
 
-getGrant
+getClaim
   :: forall name ts ns
    . CanGet name ts
-  => GrantName name
+  => ClaimName name
   -> PrivateClaims ts ns
   -> LookupClaimType name ts
-getGrant _ = unsafeLookup claimName
+getClaim _ = unsafeLookup name
  where
-  claimName = symbolVal (Proxy :: Proxy name)
-{-# INLINE getGrant #-}
+  name = symbolVal (Proxy :: Proxy name)
+{-# INLINE getClaim #-}
 
 (.!) :: forall name ts ns
       . CanGet name ts
      => PrivateClaims ts ns
-     -> GrantName name
+     -> ClaimName name
      -> LookupClaimType name ts
-pc .! name = getGrant name pc
+pc .! name = getClaim name pc
 
 getHead
   :: forall name a tl ns . (KnownSymbol name, KnownNamespace ns) => PrivateClaims (name ->> a : tl) ns -> (String, a)
@@ -228,7 +228,7 @@ getTail = coerce
 view :: forall name a tl ns . KnownSymbol name => PrivateClaims (name ->> a : tl) ns -> (a, PrivateClaims tl ns)
 view pc = (a, tl)
  where
-   a = pc .! (GrantName @name)
+   a = pc .! (ClaimName @name)
    tl = getTail pc
 
 pattern (:<) :: KnownSymbol name => a -> PrivateClaims tl ns -> PrivateClaims (name ->> a : tl) ns
@@ -237,7 +237,7 @@ pattern head :< tail <- (view -> (head, tail))
 {-# COMPLETE (:<) :: PrivateClaims #-}
 
 withNs
-  :: ToPrivateClaims a => Ns ns -> a -> PrivateClaims (Grants a) ( 'SomeNs ns)
+  :: ToPrivateClaims a => Ns ns -> a -> PrivateClaims (Claims a) ( 'SomeNs ns)
 withNs _ = coerce . toPrivateClaims
 
 someNs :: Ns ns -> PrivateClaims ts 'NoNs -> PrivateClaims ts ( 'SomeNs ns)
@@ -280,7 +280,7 @@ instance
 data DecodeTy = Opt | Req | Mono
 
 class DecodeAux (ty :: DecodeTy) (ns :: Namespace) (name :: Symbol) (a :: Type) where
-  decodeAux :: JwtT -> JwtIO (GrantWitness name a)
+  decodeAux :: JwtT -> JwtIO (ClaimWitness name a)
 
 instance
   ( b ~ Maybe a
@@ -343,47 +343,47 @@ instance Eq (PrivateClaims Empty any) where
   _ == _ = True
 
 instance (Eq a, KnownSymbol name, Eq (PrivateClaims tl ns)) => Eq (PrivateClaims (name ->> a : tl) ns) where
-  pc1 == pc2 = pc1 .! (GrantName @name) == pc2 .! (GrantName @name) && getTail pc1 == getTail pc2
+  pc1 == pc2 = pc1 .! (ClaimName @name) == pc2 .! (ClaimName @name) && getTail pc1 == getTail pc2
 
 class ToPrivateClaims a where
-  type Grants a :: [Claim Type]
-  type Grants a = GrantsFromRecord (Rep a)
+  type Claims a :: [Claim Type]
+  type Claims a = ClaimsFromRecord (Rep a)
 
   type OutNs a :: Namespace
   type OutNs a = 'NoNs
 
-  toPrivateClaims :: a -> PrivateClaims (Grants a) (OutNs a)
+  toPrivateClaims :: a -> PrivateClaims (Claims a) (OutNs a)
 
   default toPrivateClaims
     :: ( Generic a
        , RecordToPrivateClaims (Rep a)
-       , Grants a ~ GrantsFromRecord (Rep a)
+       , Claims a ~ ClaimsFromRecord (Rep a)
        , OutNs a ~ 'NoNs
        )
-    => a -> PrivateClaims (Grants a) (OutNs a)
+    => a -> PrivateClaims (Claims a) (OutNs a)
   toPrivateClaims = genericToPrivateClaims . from
 
 class FromPrivateClaims a where
-  fromPrivateClaims :: ts ~ Grants a => PrivateClaims ts ns -> a
+  fromPrivateClaims :: ts ~ Claims a => PrivateClaims ts ns -> a
 
   default fromPrivateClaims 
     :: ( Generic a
        , RecordFromPrivateClaims (Rep a)
-       , ts ~ GrantsFromRecord(Rep a)
+       , ts ~ ClaimsFromRecord(Rep a)
        ) 
     => PrivateClaims ts ns -> a
   fromPrivateClaims = to . genericFromPrivateClaims
 
 class RecordToPrivateClaims g where
-  type GrantsFromRecord g :: [Claim Type]
+  type ClaimsFromRecord g :: [Claim Type]
 
-  genericToPrivateClaims :: g p -> PrivateClaims (GrantsFromRecord g) 'NoNs
+  genericToPrivateClaims :: g p -> PrivateClaims (ClaimsFromRecord g) 'NoNs
 
 class RecordFromPrivateClaims g where
-  genericFromPrivateClaims :: PrivateClaims (GrantsFromRecord g) ns -> g p
+  genericFromPrivateClaims :: PrivateClaims (ClaimsFromRecord g) ns -> g p
 
 instance RecordToPrivateClaims c => RecordToPrivateClaims (D1 m c) where
-  type GrantsFromRecord (D1 m c) = GrantsFromRecord c
+  type ClaimsFromRecord (D1 m c) = ClaimsFromRecord c
 
   genericToPrivateClaims (M1 c) = genericToPrivateClaims c
 
@@ -391,7 +391,7 @@ instance RecordFromPrivateClaims c => RecordFromPrivateClaims (D1 m c) where
   genericFromPrivateClaims = M1 . genericFromPrivateClaims
 
 instance RecordToPrivateClaims f => RecordToPrivateClaims (C1 m f) where
-  type GrantsFromRecord (C1 m f) = GrantsFromRecord f
+  type ClaimsFromRecord (C1 m f) = ClaimsFromRecord f
 
   genericToPrivateClaims (M1 f) = genericToPrivateClaims f
 
@@ -403,7 +403,7 @@ type family (+++) (lhs :: [k]) (rhs :: [k]) :: [k] where
   (a : rest) +++ rhs = a : (rest +++ rhs)
 
 instance (RecordToPrivateClaims s1, RecordToPrivateClaims s2) => RecordToPrivateClaims (s1 :*: s2) where
-  type GrantsFromRecord (s1 :*: s2) = GrantsFromRecord s1 +++ GrantsFromRecord s2
+  type ClaimsFromRecord (s1 :*: s2) = ClaimsFromRecord s1 +++ ClaimsFromRecord s2
 
   genericToPrivateClaims (s1 :*: s2) = PrivateClaims $ HashMap.union store1 store2
     where
@@ -429,7 +429,7 @@ type family SelectorName (m :: Meta) :: Symbol where
   SelectorName ('MetaSel ('Just s) _ _ _) = s
 
 instance (Selector s, HasSelectorName s) =>  RecordToPrivateClaims (S1 s (Rec0 a)) where
-  type GrantsFromRecord (S1 s (Rec0 a)) = '[SelectorName s ->> a]
+  type ClaimsFromRecord (S1 s (Rec0 a)) = '[SelectorName s ->> a]
 
   genericToPrivateClaims (M1 (K1 a)) = PrivateClaims $ HashMap.singleton fieldName $ Any a
     where
@@ -465,20 +465,20 @@ instance
   genericFromPrivateClaims = error "impossible"
 
 instance ToPrivateClaims () where
-  type Grants () = Empty
+  type Claims () = Empty
 
   toPrivateClaims _ = nullClaims
 
-instance CanAdd n '[] => ToPrivateClaims (GrantWitness n a) where
-  type Grants (GrantWitness n a) = '[n ->> a]
-  toPrivateClaims (Witness a) = addGrant GrantName a nullClaims
+instance CanAdd n '[] => ToPrivateClaims (ClaimWitness n a) where
+  type Claims (ClaimWitness n a) = '[n ->> a]
+  toPrivateClaims (Witness a) = addClaim ClaimName a nullClaims
 
-instance (CanAdd n2 '[], CanAdd n1 '[n2 ->> b]) => ToPrivateClaims (GrantWitness n1 a, GrantWitness n2 b) where
-  type Grants (GrantWitness n1 a, GrantWitness n2 b) = '[n1 ->> a, n2 ->> b]
+instance (CanAdd n2 '[], CanAdd n1 '[n2 ->> b]) => ToPrivateClaims (ClaimWitness n1 a, ClaimWitness n2 b) where
+  type Claims (ClaimWitness n1 a, ClaimWitness n2 b) = '[n1 ->> a, n2 ->> b]
   toPrivateClaims (Witness a, Witness b) =
-    addGrant GrantName a $ addGrant GrantName b nullClaims
+    addClaim ClaimName a $ addClaim ClaimName b nullClaims
 
-instance (KnownSymbol n1, KnownSymbol n2) => FromPrivateClaims (GrantWitness n1 a, GrantWitness n2 b) where
+instance (KnownSymbol n1, KnownSymbol n2) => FromPrivateClaims (ClaimWitness n1 a, ClaimWitness n2 b) where
   fromPrivateClaims (a :< b :< _) = (Witness a, Witness b)
 
 instance
@@ -486,18 +486,18 @@ instance
   , CanAdd n2 '[n3 ->> c]
   , CanAdd n3 '[]
   )
-  => ToPrivateClaims (GrantWitness n1 a, GrantWitness n2 b, GrantWitness n3 c) where
-  type Grants (GrantWitness n1 a, GrantWitness n2 b, GrantWitness n3 c) = '[n1 ->> a, n2 ->> b, n3 ->> c]
+  => ToPrivateClaims (ClaimWitness n1 a, ClaimWitness n2 b, ClaimWitness n3 c) where
+  type Claims (ClaimWitness n1 a, ClaimWitness n2 b, ClaimWitness n3 c) = '[n1 ->> a, n2 ->> b, n3 ->> c]
   toPrivateClaims (Witness a, Witness b, Witness c) =
-    addGrant GrantName a $
-    addGrant GrantName b $
-    addGrant GrantName c nullClaims
+    addClaim ClaimName a $
+    addClaim ClaimName b $
+    addClaim ClaimName c nullClaims
 
 instance 
   ( KnownSymbol n1
   , KnownSymbol n2
   , KnownSymbol n3
-  ) => FromPrivateClaims (GrantWitness n1 a, GrantWitness n2 b, GrantWitness n3 c) where
+  ) => FromPrivateClaims (ClaimWitness n1 a, ClaimWitness n2 b, ClaimWitness n3 c) where
   fromPrivateClaims (a :< b :< c :< _) = (Witness a, Witness b ,Witness c)
 
 instance
@@ -506,13 +506,13 @@ instance
   , CanAdd n3 '[n4 ->> d]
   , CanAdd n4 '[]
   )
-  => ToPrivateClaims (GrantWitness n1 a, GrantWitness n2 b, GrantWitness n3 c, GrantWitness n4 d) where
-  type Grants (GrantWitness n1 a, GrantWitness n2 b, GrantWitness n3 c, GrantWitness n4 d) = '[n1 ->> a, n2 ->> b, n3 ->> c, n4 ->> d]
+  => ToPrivateClaims (ClaimWitness n1 a, ClaimWitness n2 b, ClaimWitness n3 c, ClaimWitness n4 d) where
+  type Claims (ClaimWitness n1 a, ClaimWitness n2 b, ClaimWitness n3 c, ClaimWitness n4 d) = '[n1 ->> a, n2 ->> b, n3 ->> c, n4 ->> d]
   toPrivateClaims (Witness a, Witness b, Witness c, Witness d) =
-    addGrant GrantName a $
-    addGrant GrantName b $
-    addGrant GrantName c $
-    addGrant GrantName d nullClaims
+    addClaim ClaimName a $
+    addClaim ClaimName b $
+    addClaim ClaimName c $
+    addClaim ClaimName d nullClaims
 
 instance 
   ( KnownSymbol n1
@@ -520,7 +520,7 @@ instance
   , KnownSymbol n3
   , KnownSymbol n4
   ) 
-  => FromPrivateClaims (GrantWitness n1 a, GrantWitness n2 b, GrantWitness n3 c, GrantWitness n4 d) where
+  => FromPrivateClaims (ClaimWitness n1 a, ClaimWitness n2 b, ClaimWitness n3 c, ClaimWitness n4 d) where
   fromPrivateClaims (a :< b :< c :< d :< _) =
     (Witness a, Witness b, Witness c, Witness d)
 
@@ -531,20 +531,20 @@ instance
   , CanAdd n4 '[n5 ->> e]
   , CanAdd n5 '[]
   )
-  => ToPrivateClaims (GrantWitness n1 a, GrantWitness n2 b, GrantWitness n3 c, GrantWitness n4 d, GrantWitness n5 e) where
-  type Grants
-    ( GrantWitness n1 a
-    , GrantWitness n2 b
-    , GrantWitness n3 c
-    , GrantWitness n4 d
-    , GrantWitness n5 e) = '[n1 ->> a, n2 ->> b, n3 ->> c, n4 ->> d, n5 ->> e]
+  => ToPrivateClaims (ClaimWitness n1 a, ClaimWitness n2 b, ClaimWitness n3 c, ClaimWitness n4 d, ClaimWitness n5 e) where
+  type Claims
+    ( ClaimWitness n1 a
+    , ClaimWitness n2 b
+    , ClaimWitness n3 c
+    , ClaimWitness n4 d
+    , ClaimWitness n5 e) = '[n1 ->> a, n2 ->> b, n3 ->> c, n4 ->> d, n5 ->> e]
 
   toPrivateClaims (Witness a, Witness b, Witness c, Witness d, Witness e) =
-    addGrant GrantName a $
-    addGrant GrantName b $
-    addGrant GrantName c $
-    addGrant GrantName d $
-    addGrant GrantName e nullClaims
+    addClaim ClaimName a $
+    addClaim ClaimName b $
+    addClaim ClaimName c $
+    addClaim ClaimName d $
+    addClaim ClaimName e nullClaims
 
 instance
   ( KnownSymbol n1
@@ -553,7 +553,7 @@ instance
   , KnownSymbol n4
   , KnownSymbol n5
   )
-  => FromPrivateClaims (GrantWitness n1 a, GrantWitness n2 b, GrantWitness n3 c, GrantWitness n4 d, GrantWitness n5 e) where
+  => FromPrivateClaims (ClaimWitness n1 a, ClaimWitness n2 b, ClaimWitness n3 c, ClaimWitness n4 d, ClaimWitness n5 e) where
   fromPrivateClaims (a :< b :< c :< d :< e :< _) = (Witness a, Witness b, Witness c, Witness d, Witness e)
 
 instance
@@ -565,27 +565,27 @@ instance
   , CanAdd n6 '[]
   )
   => ToPrivateClaims
-     ( GrantWitness n1 a
-     , GrantWitness n2 b
-     , GrantWitness n3 c
-     , GrantWitness n4 d
-     , GrantWitness n5 e
-     , GrantWitness n6 f) where
-  type Grants
-    ( GrantWitness n1 a
-    , GrantWitness n2 b
-    , GrantWitness n3 c
-    , GrantWitness n4 d
-    , GrantWitness n5 e
-    , GrantWitness n6 f) = '[n1 ->> a, n2 ->> b, n3 ->> c, n4 ->> d, n5 ->> e, n6 ->> f]
+     ( ClaimWitness n1 a
+     , ClaimWitness n2 b
+     , ClaimWitness n3 c
+     , ClaimWitness n4 d
+     , ClaimWitness n5 e
+     , ClaimWitness n6 f) where
+  type Claims
+    ( ClaimWitness n1 a
+    , ClaimWitness n2 b
+    , ClaimWitness n3 c
+    , ClaimWitness n4 d
+    , ClaimWitness n5 e
+    , ClaimWitness n6 f) = '[n1 ->> a, n2 ->> b, n3 ->> c, n4 ->> d, n5 ->> e, n6 ->> f]
 
   toPrivateClaims (Witness a, Witness b, Witness c, Witness d, Witness e, Witness f) =
-    addGrant GrantName a $
-    addGrant GrantName b $
-    addGrant GrantName c $
-    addGrant GrantName d $
-    addGrant GrantName e $
-    addGrant GrantName f nullClaims
+    addClaim ClaimName a $
+    addClaim ClaimName b $
+    addClaim ClaimName c $
+    addClaim ClaimName d $
+    addClaim ClaimName e $
+    addClaim ClaimName f nullClaims
 
 instance   
   ( KnownSymbol n1
@@ -596,12 +596,12 @@ instance
   , KnownSymbol n6
   )
   =>  FromPrivateClaims
-      ( GrantWitness n1 a
-      , GrantWitness n2 b
-      , GrantWitness n3 c
-      , GrantWitness n4 d
-      , GrantWitness n5 e
-      , GrantWitness n6 f) where
+      ( ClaimWitness n1 a
+      , ClaimWitness n2 b
+      , ClaimWitness n3 c
+      , ClaimWitness n4 d
+      , ClaimWitness n5 e
+      , ClaimWitness n6 f) where
   fromPrivateClaims (a :< b :< c :< d :< e :< f :< _) =
     (Witness a, Witness b, Witness c, Witness d, Witness e, Witness f)
 
@@ -615,30 +615,30 @@ instance
   , CanAdd n7 '[]
   )
   => ToPrivateClaims
-    ( GrantWitness n1 a
-    , GrantWitness n2 b
-    , GrantWitness n3 c
-    , GrantWitness n4 d
-    , GrantWitness n5 e
-    , GrantWitness n6 f
-    , GrantWitness n7 g) where
-  type Grants
-    ( GrantWitness n1 a
-    , GrantWitness n2 b
-    , GrantWitness n3 c
-    , GrantWitness n4 d
-    , GrantWitness n5 e
-    , GrantWitness n6 f
-    , GrantWitness n7 g) = '[n1 ->> a, n2 ->> b, n3 ->> c, n4 ->> d, n5 ->> e, n6 ->> f, n7 ->> g]
+    ( ClaimWitness n1 a
+    , ClaimWitness n2 b
+    , ClaimWitness n3 c
+    , ClaimWitness n4 d
+    , ClaimWitness n5 e
+    , ClaimWitness n6 f
+    , ClaimWitness n7 g) where
+  type Claims
+    ( ClaimWitness n1 a
+    , ClaimWitness n2 b
+    , ClaimWitness n3 c
+    , ClaimWitness n4 d
+    , ClaimWitness n5 e
+    , ClaimWitness n6 f
+    , ClaimWitness n7 g) = '[n1 ->> a, n2 ->> b, n3 ->> c, n4 ->> d, n5 ->> e, n6 ->> f, n7 ->> g]
 
   toPrivateClaims (Witness a, Witness b, Witness c, Witness d, Witness e, Witness f, Witness g) =
-    addGrant GrantName a $
-    addGrant GrantName b $
-    addGrant GrantName c $
-    addGrant GrantName d $
-    addGrant GrantName e $
-    addGrant GrantName f $
-    addGrant GrantName g nullClaims
+    addClaim ClaimName a $
+    addClaim ClaimName b $
+    addClaim ClaimName c $
+    addClaim ClaimName d $
+    addClaim ClaimName e $
+    addClaim ClaimName f $
+    addClaim ClaimName g nullClaims
 
 instance
   ( KnownSymbol n1
@@ -650,19 +650,19 @@ instance
   , KnownSymbol n7
   ) 
   => FromPrivateClaims 
-     ( GrantWitness n1 a
-     , GrantWitness n2 b
-     , GrantWitness n3 c
-     , GrantWitness n4 d
-     , GrantWitness n5 e
-     , GrantWitness n6 f
-     , GrantWitness n7 g) where
+     ( ClaimWitness n1 a
+     , ClaimWitness n2 b
+     , ClaimWitness n3 c
+     , ClaimWitness n4 d
+     , ClaimWitness n5 e
+     , ClaimWitness n6 f
+     , ClaimWitness n7 g) where
   fromPrivateClaims (a :< b :< c :< d :< e :< f :< g :< _) =
     (Witness a, Witness b, Witness c, Witness d, Witness e, Witness f, Witness g)
    
 
 instance ToPrivateClaims (PrivateClaims ts ns) where
-  type Grants (PrivateClaims ts ns) = ts
+  type Claims (PrivateClaims ts ns) = ts
   type OutNs (PrivateClaims ts ns) = ns
   toPrivateClaims = id
 

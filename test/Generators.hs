@@ -240,15 +240,15 @@ instance
   => Arbitrary (PrivateClaims (n ->> a ': tl) 'NoNs) where
   arbitrary = liftA2 (.:) genWitness arbitrary
   shrink (a :< tl) = tail
-    $ liftA2 (.:) (map (GrantName ->>) $ shrink' a) (shrink' tl)
+    $ liftA2 (.:) (map (ClaimName ->>) $ shrink' a) (shrink' tl)
     where shrink' x = x : shrink x
 
 instance Arbitrary (PrivateClaims ts 'NoNs) => Arbitrary (PrivateClaims ts ('SomeNs ns)) where
   arbitrary = someNs Ns <$> arbitrary
   shrink    = shrinkMap (someNs Ns) noNs
 
-genWitness :: Arbitrary a => Gen (GrantWitness name a)
-genWitness = (GrantName ->>) <$> arbitrary
+genWitness :: Arbitrary a => Gen (ClaimWitness name a)
+genWitness = (ClaimName ->>) <$> arbitrary
 
 genShortPrintable :: Gen PrintableString
 genShortPrintable = resize 32 arbitrary

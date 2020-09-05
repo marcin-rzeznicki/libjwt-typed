@@ -104,7 +104,7 @@ newtype JwtBuilder any1 any2 = JwtBuilder { steps :: Ap (Reader UTCTime) (Endo (
   deriving newtype (Semigroup, Monoid)
 
 jwtPayload
-  :: (MonadTime m, ToPrivateClaims a, Grants a ~ b, OutNs a ~ ns)
+  :: (MonadTime m, ToPrivateClaims a, Claims a ~ b, OutNs a ~ ns)
   => JwtBuilder b ns
   -> a
   -> m (Payload b ns)
