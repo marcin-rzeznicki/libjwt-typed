@@ -125,9 +125,16 @@ benchmark libjwt-typed-benchmark
   main-is:             Benchmarks.hs
   other-modules:       Env
                        Algorithms
+                       Benchmarks.Libjwt
+                       Benchmarks.Jose
+                       Benchmarks.Data
   build-depends:       libjwt-typed,
                        criterion,
                        QuickCheck >= 2.13.2 && < 2.15,
+                       jose >= 0.8.3,
+                       lens,
+                       aeson,
+                       unordered-containers
   ghc-options:         -O2
                        -threaded
                        -rtsopts
