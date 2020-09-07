@@ -18,9 +18,7 @@ import           Generators
 import           Libjwt.Classes
 import           Libjwt.JsonByteString
 import           Libjwt.JwtValidation           ( runValidation )
-import           Libjwt.NumericDate             ( plusSeconds
-                                                , minusSeconds
-                                                )
+import           Libjwt.NumericDate             ( minusSeconds )
 
 import           Control.Arrow                  ( left )
 import           Control.Exception              ( displayException )

@@ -37,6 +37,7 @@ module Web.Libjwt
        , NumericDate(..)
        , fromUTC
        , fromPOSIX
+       , plusSeconds
        , ASCII(..)
        , module Libjwt.Flag
        )
