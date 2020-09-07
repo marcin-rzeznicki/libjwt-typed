@@ -155,7 +155,7 @@ instance FromJSON Account
 instance ToJSON Account
 
 instance JwtRep JsonByteString Account where
-  rep   = JsonBs . encode
+  rep   = Json . encode
   unRep = decode . toJson
 
 instance JsonBuilder Account

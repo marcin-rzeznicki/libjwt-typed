@@ -37,9 +37,6 @@ import           Control.Monad.Catch            ( throwM )
 import           Control.Monad.Trans.Maybe
 
 import           Data.ByteString                ( ByteString )
-import           Data.ByteString.Lazy           ( toStrict
-                                                , fromStrict
-                                                )
 
 import           Data.Coerce
 import           Data.Kind                      ( Constraint )
@@ -103,8 +100,7 @@ instance ClaimDecoder' 'Native NumericDate where
   {-# INLINE decodeClaim' #-}
 
 instance ClaimDecoder' 'Native JsonByteString where
-  decodeClaim' _ name =
-    (fmap (JsonBs . fromStrict)) . Result . getGrantAsJson name
+  decodeClaim' _ name = fmap jsonFromStrict . Result . getGrantAsJson name
   {-# INLINE decodeClaim' #-}
 
 fromJsonNative
@@ -118,8 +114,7 @@ instance JsonParser a => ClaimDecoder' 'Native [a] where
     fromJsonNative
       $ fmap (sequence =<<)
       . unsafeMapTokenizedJsonArray jsonParser
-      . toStrict
-      . toJson
+      . toJsonStrict
   {-# INLINE decodeClaim' #-}
 
 instance (JwtRep b a, DecoderDef b ~ ty, ClaimDecoder' ty b) => ClaimDecoder' 'Derived a where

@@ -36,7 +36,6 @@ import           Data.ByteString.Builder        ( Builder
                                                 , int64Dec
                                                 , string7
                                                 , charUtf8
-                                                , lazyByteString
                                                 )
 import           Data.ByteString.Builder.Extra  ( toLazyByteStringWith
                                                 , safeStrategy
@@ -185,7 +184,7 @@ instance AFlag a => JsonBuilder (Flag a) where
   jsonBuilder = quoteString . string7 . getASCII . getFlagValue
 
 instance JsonBuilder JsonByteString where
-  jsonBuilder = lazyByteString . toJson
+  jsonBuilder = toJsonBuilder
 
 instance JsonBuilder a => JsonBuilder [a] where
   jsonBuilder = encodeArray
@@ -310,7 +309,7 @@ instance AFlag a => JsonParser (Flag a) where
   jsonParser _          = Nothing
 
 instance JsonParser JsonByteString where
-  jsonParser (JsBlob bs) = Just $ JsonBs $ Lazy.fromStrict bs
+  jsonParser (JsBlob bs) = Just $ jsonFromStrict bs
   jsonParser _           = Nothing
 
 instance JsonParser a => JsonParser [a] where

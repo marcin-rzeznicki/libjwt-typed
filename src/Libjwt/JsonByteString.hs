@@ -6,13 +6,29 @@
 
 module Libjwt.JsonByteString
   ( JsonByteString(..)
+  , jsonFromStrict
+  , toJsonStrict
+  , toJsonBuilder
   )
 where
 
+import           Data.ByteString                ( ByteString )
+import           Data.ByteString.Builder        ( Builder
+                                                , lazyByteString
+                                                )
 import qualified Data.ByteString.Lazy          as Lazy
 
-newtype JsonByteString = JsonBs { toJson :: Lazy.ByteString }
+newtype JsonByteString = Json { toJson :: Lazy.ByteString }
   deriving stock (Show, Eq)
+
+jsonFromStrict :: ByteString -> JsonByteString
+jsonFromStrict = Json . Lazy.fromStrict
+
+toJsonStrict :: JsonByteString -> ByteString
+toJsonStrict = Lazy.toStrict . toJson
+
+toJsonBuilder :: JsonByteString -> Builder
+toJsonBuilder = lazyByteString . toJson
 
 
 
