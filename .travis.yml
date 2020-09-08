@@ -1,14 +1,12 @@
-sudo: true
+os: linux
+dist: focal
 language: haskell
 
 git:
   depth: 5
 
-cabal: "2.4"
-
 cache:
   directories:
-  
   - "$HOME/.stack"
   - "$TRAVIS_BUILD_DIR/.stack-work"
 
@@ -16,6 +14,17 @@ matrix:
   include:
   - ghc: 8.8.3
     env: STACK_YAML="$TRAVIS_BUILD_DIR/stack.yaml"
+  - ghc: 8.10.1
+    env: STACK_YAML="$TRAVIS_BUILD_DIR/stack.nightly.yaml
+
+addons:
+  apt:
+    update: true
+    sources:
+      - sourceline: 'deb http://archive.ubuntu.com/ubuntu focal universe'
+    packages:
+      - libjwt-dev
+      - libjwt0
 
 install:
   # HLint check
