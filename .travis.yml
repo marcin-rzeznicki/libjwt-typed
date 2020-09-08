@@ -1,5 +1,6 @@
 os: linux
 dist: focal
+language: generic
 
 git:
   depth: 5
@@ -39,7 +40,7 @@ install:
 
   - curl -sSL https://get.haskellstack.org/ | sh
   - stack --version
-  - stack build --system-ghc --test --bench --no-run-tests --no-run-benchmarks --ghc-options=-Werror
+  - stack build --system-ghc --test --bench --no-run-tests --no-run-benchmarks --ghc-options='-Werror -Wno-missing-export-lists -Wno-name-shadowing -Wno-deprecations'
 
 script:
   - stack test --system-ghc
