@@ -66,10 +66,10 @@ import           Control.Monad.Trans.Class      ( lift )
 import           Data.ByteString                ( ByteString
                                                 , useAsCString
                                                 , packCString
+                                                , packCStringLen
                                                 )
 import           Data.ByteString.Unsafe         ( unsafePackMallocCString
                                                 , unsafeUseAsCStringLen
-                                                , unsafePackCStringLen
                                                 )
 
 import           Foreign                 hiding ( void )
@@ -367,7 +367,7 @@ foldrJson f z p_js ptokens count = evalStateT (go f z count) 0
     let s = start tok
         e = end tok
         n = e - s
-    in  unsafePackCStringLen (p_js `plusPtr` fromIntegral s, fromIntegral n)
+    in  packCStringLen (p_js `plusPtr` fromIntegral s, fromIntegral n)
 
   nextSibling supertok = loopM
     (\j -> do
