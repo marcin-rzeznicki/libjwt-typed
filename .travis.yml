@@ -1,6 +1,5 @@
 os: linux
 dist: focal
-language: haskell
 
 git:
   depth: 5
@@ -12,19 +11,27 @@ cache:
 
 matrix:
   include:
-  - ghc: 8.8.3
-    env: STACK_YAML="$TRAVIS_BUILD_DIR/stack.yaml"
-  - ghc: 8.10.1
-    env: STACK_YAML="$TRAVIS_BUILD_DIR/stack.nightly.yaml"
+  - env: GHCVER=8.8.3 STACK_YAML="$TRAVIS_BUILD_DIR/stack.yaml"
+    addons:
+      apt:
+        sources:
+        - sourceline: "ppa:hvr/ghc"
+        packages:
+        - ghc-8.8.3   
+        - libjwt-dev
+        - libjwt0
+  - env: GHCVER=8.10.1 STACK_YAML="$TRAVIS_BUILD_DIR/stack.nightly.yaml"
+    addons:
+      apt:
+        sources:
+        - sourceline: "ppa:hvr/ghc"
+        packages:
+        - ghc-8.10.1
+        - libjwt-dev
+        - libjwt0  
 
-addons:
-  apt:
-    update: true
-    sources:
-      - sourceline: 'deb http://archive.ubuntu.com/ubuntu focal universe'
-    packages:
-      - libjwt-dev
-      - libjwt0
+before_install:
+  - export PATH=/opt/ghc/$GHCVER/bin:$PATH
 
 install:
   # HLint check
