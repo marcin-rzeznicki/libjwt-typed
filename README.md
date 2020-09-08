@@ -292,8 +292,8 @@ type MyJwt
       '["userId" ->> UUID, "userName" ->> Text, "isRoot" ->> Bool, "createdAt" ->> UTCTime, "accounts" ->> NonEmpty UUID]
       'NoNs
 
-decode_do_not_use :: IO (Decoded MyJwt)
-decode_do_not_use = decodeByteString hmac512 =<< token
+decodeDoNotUse :: IO (Decoded MyJwt)
+decodeDoNotUse = decodeByteString hmac512 =<< token
 
 {-
 λ> decode_do_not_use
