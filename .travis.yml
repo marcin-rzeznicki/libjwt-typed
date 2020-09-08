@@ -15,7 +15,7 @@ matrix:
   - ghc: 8.8.3
     env: STACK_YAML="$TRAVIS_BUILD_DIR/stack.yaml"
   - ghc: 8.10.1
-    env: STACK_YAML="$TRAVIS_BUILD_DIR/stack.nightly.yaml
+    env: STACK_YAML="$TRAVIS_BUILD_DIR/stack.nightly.yaml"
 
 addons:
   apt:
