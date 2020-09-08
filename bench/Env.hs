@@ -40,7 +40,7 @@ data BenchEnv = LocalEnv { uuid :: UUID
                          , accountList :: NonEmpty (UUID, Text)
                          , emailsList :: [String]
                          }
-  deriving stock (Generic)
+  deriving stock (Show, Generic)
 
 instance NFData BenchEnv
 

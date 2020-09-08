@@ -20,4 +20,3 @@ data Scope = Login | Extended | UserRead | UserWrite | AccountRead | AccountWrit
 instance AFlag Scope
 instance ToJSON Scope
 instance FromJSON Scope
-

@@ -38,7 +38,8 @@ import           Criterion                      ( Benchmark
 import           Crypto.JOSE.JWK
 import           Crypto.JWT
 
-import           Data.Aeson                     ( Result(..)
+import           Data.Aeson                     ( Value
+                                                , Result(..)
                                                 , toJSON
                                                 , fromJSON
                                                 )
@@ -48,7 +49,9 @@ import           Data.ByteString.Lazy           ( toStrict
                                                 , fromStrict
                                                 )
 
-import           Data.HashMap.Strict            ( (!) )
+import           Data.HashMap.Strict            ( HashMap
+                                                , (!)
+                                                )
 
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as T
@@ -67,6 +70,11 @@ doSign a k claims =
 
 prepareToken :: (BenchEnv -> ClaimsSet) -> Alg -> JWK -> IO ByteString
 prepareToken f a k = localEnv >>= doSign a k . f
+
+decodeJson :: (HashMap Text Value -> Result b) -> ClaimsSet -> Either JWTError b
+decodeJson f claimsSet = case f (view unregisteredClaims claimsSet) of
+  Success d   -> Right d
+  Error   str -> Left $ JWTClaimsSetDecodeError str
 
 
 
@@ -100,8 +108,8 @@ decodeSimple (a, k) =
   benchmark :: ByteString -> IO (Either JWTError ClaimsSet)
   benchmark token =
     runExceptT
-      $   verifyClaims (validation & issuerPredicate .~ (== "benchmarks")) k
-      =<< decodeCompact (fromStrict token)
+      $   decodeCompact (fromStrict token)
+      >>= verifyClaims (validation & issuerPredicate .~ (== "benchmarks")) k
 
 
 
@@ -127,15 +135,12 @@ decodeCustomClaims (a, k) =
  where
   benchmark
     :: ByteString -> IO (Either JWTError (Text, Bool, UUID, UTCTime, Scope))
-  benchmark token = runExceptT $ do
-    signed    <- decodeCompact $ fromStrict token
-    claimsSet <- verifyClaims
-      (validation & issuerPredicate .~ (== "benchmarks"))
-      k
-      signed
-    except $ case decodeData (view unregisteredClaims claimsSet) of
-      Success d   -> Right d
-      Error   str -> Left $ JWTClaimsSetDecodeError str
+  benchmark token =
+    runExceptT
+      $   decodeCompact (fromStrict token)
+      >>= verifyClaims (validation & issuerPredicate .~ (== "benchmarks")) k
+      >>= except
+      .   decodeJson decodeData
 
   decodeData claims =
     (,,,,)
@@ -171,19 +176,12 @@ decodeCustomClaimsWithNs (a, k) =
  where
   benchmark
     :: ByteString -> IO (Either JWTError (Text, Bool, UUID, UTCTime, Scope))
-  benchmark token = runExceptT $ do
-    signed    <- decodeCompact $ fromStrict token
-    claimsSet <- verifyClaims
-      (validation & issuerPredicate .~ (== "benchmarks"))
-      k
-      signed
-    except
-      $ case
-          decodeData "https://www.example.com/test"
-                     (view unregisteredClaims claimsSet)
-        of
-          Success d   -> Right d
-          Error   str -> Left $ JWTClaimsSetDecodeError str
+  benchmark token =
+    runExceptT
+      $   decodeCompact (fromStrict token)
+      >>= verifyClaims (validation & issuerPredicate .~ (== "benchmarks")) k
+      >>= except
+      .   decodeJson (decodeData "https://www.example.com/test")
 
   decodeData ns claims =
     (,,,,)
@@ -236,15 +234,12 @@ decodeComplexClaims (a, k) =
              , [String]
              )
          )
-  benchmark token = runExceptT $ do
-    signed    <- decodeCompact $ fromStrict token
-    claimsSet <- verifyClaims
-      (validation & issuerPredicate .~ (== "benchmarks"))
-      k
-      signed
-    except $ case decodeData (view unregisteredClaims claimsSet) of
-      Success d   -> Right d
-      Error   str -> Left $ JWTClaimsSetDecodeError str
+  benchmark token =
+    runExceptT
+      $   decodeCompact (fromStrict token)
+      >>= verifyClaims (validation & issuerPredicate .~ (== "benchmarks")) k
+      >>= except
+      .   decodeJson decodeData
 
   decodeData claims =
     (,,,,,,)

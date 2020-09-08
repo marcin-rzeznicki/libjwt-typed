@@ -40,15 +40,16 @@ import           Data.Time.Clock                ( UTCTime )
 
 import           Data.UUID                      ( UUID )
 
+import           Prelude                 hiding ( exp )
+
 basePayload :: BenchEnv -> Payload Empty 'NoNs
-basePayload LocalEnv {..} = def
-  { iss            = Iss (Just "benchmarks")
-  , aud            = Aud ["https://example.com"]
-  , sub            = Sub (Just subject)
-  , iat            = Iat (Just $ fromPOSIX currentTime)
-  , Web.Libjwt.exp = Exp (Just $ fromPOSIX someFutureTime)
-  , nbf            = Nbf (Just $ fromPOSIX currentTime)
-  }
+basePayload LocalEnv {..} = def { iss = Iss (Just "benchmarks")
+                                , aud = Aud ["https://example.com"]
+                                , sub = Sub (Just subject)
+                                , iat = Iat (Just $ fromPOSIX currentTime)
+                                , exp = Exp (Just $ fromPOSIX someFutureTime)
+                                , nbf = Nbf (Just $ fromPOSIX currentTime)
+                                }
 
 prepareToken
   :: Encode (PrivateClaims pc ns)
@@ -253,4 +254,3 @@ decodeComplexCustomClaims a =
 validationSettings :: ValidationSettings
 validationSettings =
   defaultValidationSettings { appName = Just "https://example.com", leeway = 5 }
-

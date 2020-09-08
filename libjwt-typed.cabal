@@ -134,8 +134,9 @@ benchmark libjwt-typed-benchmark
                        jose >= 0.8.3,
                        lens,
                        aeson,
-                       unordered-containers
+                       unordered-containers,
+                       deepseq >= 1.4.4.0
   ghc-options:         -O2
                        -threaded
                        -rtsopts
-                       "-with-rtsopts=-N -s -ki2k -A256m -n8m"
+                       "-with-rtsopts=-N -s -ki2k -A512m -n32m"

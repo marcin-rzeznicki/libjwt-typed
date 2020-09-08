@@ -81,6 +81,7 @@ signJwt it = MkEncoded $ unsafePerformJwtIO signTokenJwtIo
 {-# NOINLINE signJwt #-}
 
 newtype Decoded t = MkDecoded { getDecoded :: t }
+  deriving stock (Show, Eq)
 
 decodeString
   :: (MonadThrow m, Decode (PrivateClaims pc ns))
@@ -127,7 +128,7 @@ safeJwtDecode alg token =
   getKey None           = Nothing
 
 newtype Validated t = MkValid { getValid :: t }
- deriving stock Show
+ deriving stock (Show, Eq)
 
 validateJwt
   :: MonadTime m
