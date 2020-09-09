@@ -107,27 +107,9 @@ decodeCustomClaims :: Alg -> Benchmark
 decodeCustomClaims a =
   env (prepareToken a mkCustomJwt) $ bench "custom-claims" . whnfAppIO benchmark
  where
-  benchmark =
-    fmap
-        (fmap
-          ( (\claims ->
-              ( claims .! #userName
-              , claims .! #isRoot
-              , claims .! #clientId
-              , claims .! #created
-              , claims .! #scope
-              )
-            )
-          . privateClaims
-          . payload
-          . getValid
-          )
-        )
-      . decode
-
-  decode
+  benchmark
     :: ByteString -> IO (ValidationNEL ValidationFailure (Validated CustomJwt))
-  decode = jwtFromByteString validationSettings (checkIssuer "benchmarks") a
+  benchmark = jwtFromByteString validationSettings (checkIssuer "benchmarks") a
 
 
 
@@ -161,28 +143,10 @@ decodeWithNs a =
     $ bench "custom-claims-with-ns"
     . whnfAppIO benchmark
  where
-  benchmark =
-    fmap
-        (fmap
-          ( (\claims ->
-              ( claims .! #userName
-              , claims .! #isRoot
-              , claims .! #clientId
-              , claims .! #created
-              , claims .! #scope
-              )
-            )
-          . privateClaims
-          . payload
-          . getValid
-          )
-        )
-      . decode
-
-  decode
+  benchmark
     :: ByteString
     -> IO (ValidationNEL ValidationFailure (Validated CustomJwtWithNs))
-  decode = jwtFromByteString validationSettings (checkIssuer "benchmarks") a
+  benchmark = jwtFromByteString validationSettings (checkIssuer "benchmarks") a
 
 
 
@@ -225,29 +189,9 @@ decodeComplexCustomClaims a =
     $ bench "complex-claims"
     . whnfAppIO benchmark
  where
-  benchmark =
-    fmap
-        (fmap
-          ( (\claims ->
-              ( claims .! #user_name
-              , claims .! #is_root
-              , claims .! #client_id
-              , claims .! #created
-              , claims .! #accounts
-              , claims .! #scopes
-              , claims .! #emails
-              )
-            )
-          . privateClaims
-          . payload
-          . getValid
-          )
-        )
-      . decode
-
-  decode
+  benchmark
     :: ByteString -> IO (ValidationNEL ValidationFailure (Validated ComplexJwt))
-  decode = jwtFromByteString validationSettings (checkIssuer "benchmarks") a
+  benchmark = jwtFromByteString validationSettings (checkIssuer "benchmarks") a
 
 
 
