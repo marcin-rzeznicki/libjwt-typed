@@ -19,8 +19,8 @@ matrix:
         - sourceline: "ppa:hvr/ghc"
         packages:
         - ghc-8.8.3   
-        - libjwt-dev
-        - libjwt0
+        - libjansson-dev
+        - libssl-dev
   - env: GHCVER=8.10.1 STACK_YAML="$TRAVIS_BUILD_DIR/stack.nightly.yaml"
     addons:
       apt:
@@ -28,13 +28,21 @@ matrix:
         - sourceline: "ppa:hvr/ghc"
         packages:
         - ghc-8.10.1
-        - libjwt-dev
-        - libjwt0  
+        - libjansson-dev
+        - libssl-dev 
+        
+env:
+  global:
+    - CFLAGS="-march=native -mtune=native -O2 -pipe -fno-plt"
+    - LDFLAGS="-Wl,-O1,--sort-common,--as-needed,-z,relro,-z,now"
 
 before_install:
   - export PATH=/opt/ghc/$GHCVER/bin:$PATH
 
 install:
+  # head of libjwt
+  - git clone https://github.com/benmcollins/libjwt.git
+  - pushd libjwt && autoreconf -i && ./configure --prefix=/usr && make all && sudo make install && popd
   # HLint check
   - curl -sSL https://raw.github.com/ndmitchell/neil/master/misc/travis.sh | sh -s -- hlint .
 
