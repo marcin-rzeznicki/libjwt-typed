@@ -5,6 +5,7 @@
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -34,6 +35,7 @@ import           Libjwt.Exceptions              ( SomeDecodeException
                                                 )
 import           Libjwt.Decoding
 import           Libjwt.FFI.Jwt
+import           Libjwt.FFI.Libjwt
 import           Libjwt.Header
 import           Libjwt.JwtValidation
 import           Libjwt.Keys
@@ -49,6 +51,8 @@ import           Control.Monad                  ( (<=<) )
 
 import           Data.ByteString                ( ByteString )
 import qualified Data.ByteString.Char8         as C8
+
+import qualified Data.CaseInsensitive          as CI
 
 import           GHC.IO.Exception               ( IOErrorType(InvalidArgument) )
 
@@ -103,7 +107,27 @@ decodeByteString alg token = either throwM (pure . MkDecoded)
   decodeTokenJwtIo = try $ do
     jwt <- safeJwtDecode alg token
     unlessM (matchAlg alg <$> jwtGetAlg jwt) $ throwM AlgorithmMismatch
-    Jwt <$> decodeHeader alg jwt <*> decode jwt
+    Jwt <$> decodeHeader jwt <*> decode jwt
+
+  decodeHeader = fmap (Header alg) . decodeTyp
+
+  decodeTyp =
+    fmap
+        ( maybe (Typ Nothing)
+        $ \s -> if CI.mk s == "jwt" then JWT else Typ $ Just s
+        )
+      . getHeader "typ"
+
+  matchAlg (HS256 _) = (== jwtAlgHs256)
+  matchAlg (HS384 _) = (== jwtAlgHs384)
+  matchAlg (HS512 _) = (== jwtAlgHs512)
+  matchAlg (RS256 _) = (== jwtAlgRs256)
+  matchAlg (RS384 _) = (== jwtAlgRs384)
+  matchAlg (RS512 _) = (== jwtAlgRs512)
+  matchAlg (ES256 _) = (== jwtAlgEs256)
+  matchAlg (ES384 _) = (== jwtAlgEs384)
+  matchAlg (ES512 _) = (== jwtAlgEs512)
+  matchAlg None      = (== jwtAlgNone)
 
 {-# NOINLINE decodeByteString #-}
 

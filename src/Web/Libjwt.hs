@@ -11,48 +11,58 @@ A typesafe and idiomatic Haskell wrapper over libjwt
 -}
 
 module Web.Libjwt
-       ( module Libjwt.Jwt
-       , Alg(..)
-       , Typ(..)
-       , Header(..)
-       , module Libjwt.Keys
-       , module Libjwt.RegisteredClaims
-       , module Libjwt.PrivateClaims
-       , module Libjwt.Payload
-       , ValidationSettings(..)
-       , defaultValidationSettings
-       , ValidationNEL
-       , ValidationFailure(..)
-       , JwtValidation
-       , checkIssuer
-       , checkSubject
-       , checkAge
-       , checkIssuedAfter
-       , checkJwtId
-       , checkClaim
-       , check
-       , Encode
-       , Decode
-       , module Libjwt.Exceptions
-       , NumericDate(..)
-       , fromUTC
-       , fromPOSIX
-       , plusSeconds
-       , ASCII(..)
-       , module Libjwt.Flag
-       )
+    ( module Libjwt.Jwt
+    , module Libjwt.Exceptions
+    , module Libjwt.Header
+    , module Libjwt.Keys
+    , module Libjwt.Payload
+    , module Libjwt.RegisteredClaims
+    , module Libjwt.PrivateClaims
+    , module Libjwt.JwtValidation
+    , module Libjwt.NumericDate
+    , module Libjwt.ASCII
+    , module Libjwt.Flag
+    , module Libjwt.Encoding
+    , module Libjwt.Decoding
+    )
 where
 
-import           Libjwt.ASCII
-import           Libjwt.Decoding
-import           Libjwt.Encoding
+import           Libjwt.ASCII                   ( ASCII(..) )
+import           Libjwt.Decoding                ( Decode )
+import           Libjwt.Encoding                ( Encode )
 import           Libjwt.Exceptions
-import           Libjwt.Flag
+import           Libjwt.Flag                    ( Flag(..)
+                                                , AFlag(..)
+                                                )
 import           Libjwt.Header
-import           Libjwt.Jwt
-import           Libjwt.JwtValidation
+import           Libjwt.Jwt                     ( Jwt(..)
+                                                , Encoded
+                                                , getToken
+                                                , sign
+                                                , signJwt
+                                                , Decoded
+                                                , getDecoded
+                                                , decodeString
+                                                , decodeByteString
+                                                , Validated
+                                                , getValid
+                                                , validateJwt
+                                                , jwtFromString
+                                                , jwtFromByteString
+                                                )
+import           Libjwt.JwtValidation    hiding ( runValidation
+                                                , Valid
+                                                , Check
+                                                , invalid
+                                                , valid
+                                                , validation
+                                                )
 import           Libjwt.Keys
-import           Libjwt.NumericDate
+import           Libjwt.NumericDate             ( NumericDate(..)
+                                                , fromUTC
+                                                , fromPOSIX
+                                                , plusSeconds
+                                                )
 import           Libjwt.Payload
 import           Libjwt.PrivateClaims
 import           Libjwt.RegisteredClaims
