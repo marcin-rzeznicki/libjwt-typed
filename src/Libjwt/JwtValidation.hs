@@ -147,8 +147,8 @@ _checkNbf = using (leeway . settings)
  where
   rfc7519_415 _ _ (Nbf Nothing) = valid
   rfc7519_415 t0 skew (Nbf (Just t1))
-    | t0 `plusSeconds` skew > t1 = valid
-    | otherwise                  = invalid $ TokenNotReady $ diffSeconds t1 t0
+    | t0 `plusSeconds` skew >= t1 = valid
+    | otherwise                   = invalid $ TokenNotReady $ diffSeconds t1 t0
 
 checkAge :: NominalDiffTime -> JwtValidation any1 any2
 checkAge maxAge = using (leeway . settings)

@@ -173,7 +173,7 @@ prop_encode_decode_roundtrip_aeson = prop_encode_decode_roundtrip_poly id id
 prop_validity
   :: UTCTime -> ValidationSettings -> Payload Empty 'NoNs -> Property
 prop_validity time settings@Settings { leeway, appName } payload@ClaimsSet { exp, nbf, aud = Aud rs }
-  | now > validFrom && now < validTo && appropriate
+  | now >= validFrom && now < validTo && appropriate
   = label "valid" $ classify triviallyValid "trivial" $ success validate
   | otherwise
   = label "invalid" $ failure validate
