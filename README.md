@@ -360,6 +360,24 @@ Right (UserClaims {userId = 5a7c5cdd-3909-456b-9dd2-6ba84bfeeb25, userName = "Jo
 
 ```
 
+## Supported types
+
+Currently, serialization and deserialization of the following types is supported:
+  * ByteString
+  * String
+  * Text
+  * Libjwt.ASCII (for marking strings as ASCII only)
+  * Libjwt.JsonByteString (for working with pure JSON)
+  * Bool
+  * Libjwt.NumericDate (POSIX timestamps)
+  * Libjwt.Flag (for automatic serialization of simple sum types)
+  * Int
+  * UUID
+  * UTCTime, ZonedTime, LocalTime, Day
+  * Maybes of the above types
+  * lists of the above types and lists of tuples created from them
+  * NonEmpty lists of the above types
+
 ## Benchmarks
 
 Full result sets (graphical HTML reports) are available [here](https://github.com/marcin-rzeznicki/libjwt-typed/tree/master/bench/results). 
@@ -370,7 +388,7 @@ The Benchmarks compare `libjwt-typed` to `jose` in different hopefully real-worl
 
 ### Signing
 
-Measuring going from data to a fully signed, ready to send down-the-wire token
+Measuring going from data to a fully signed, ready to send over-the-wire token
 
 When signing an "empty" token using `SHA-512` i.e. something like
 ```json
