@@ -263,11 +263,7 @@ mkPayload''' =
 ```haskell
 
 token :: IO ByteString -- or any other MonadTime instance
-token = do
-  payload <- mkPayload''
-  return $ getToken $ signJwt Jwt { header = Header { alg = hmac512, typ = JWT }
-                                  , payload = payload
-                                  }
+token = getToken . sign hmac512 <$> mkPayload''
 
 {-
 λ> token
@@ -278,7 +274,7 @@ token = do
 
 Tip: you can inspect the above token in the [JWT debugger](https://jwt.io)
 
-`signJwt` is a pure function, we only need `Monad` for the `currentTime` used to construct the payload.
+`sign` is a pure function, we only need `Monad` for the `currentTime` used to construct the payload.
 
 ### Decoding a token
 
