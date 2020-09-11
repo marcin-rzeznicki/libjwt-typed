@@ -8,6 +8,27 @@
 
 A Haskell implementation of [JSON Web Token (JWT)](https://jwt.io).
 
+1. [Key features](#key-features)
+   1. [Type-safety](#type-safety)
+   1. [Speed and robustness](#speed-and-robustness)
+   1. [Ease of use](#ease-of-use)
+1. [Installation](#installation)
+1. [Supported algorithms](#supported-algorithms)
+   1. [Example usage](#example-usage)
+      1. [With secrets (HS256, HS384, HS512)](#with-secrets-hs256-hs384-hs512)
+      1. [With keys](#with-keys)
+1. [Usage](#usage)
+   1. [Create a payload](#create-a-payload)
+      1. [Namespaces](#namespaces)
+   1. [Signing a token](#signing-a-token)
+   1. [Decoding a token](#decoding-a-token)
+1. [Supported types](#supported-types)
+   1. [Flags](#flags)
+1. [Benchmarks](#benchmarks)
+   1. [Signing](#signing)
+   1. [Decoding](#decoding)
+1. [Idea](#idea)
+
 ## Key features
 
 ### Type-safety
@@ -16,7 +37,7 @@ Above Haskell standard type-safety, the library keeps track of public and privat
        '["user_name" ->> Text, "is_root" ->> Bool, "user_id" ->> UUID, "created" ->> UTCTime, "accounts" ->> NonEmpty (UUID, Text)]
        ('SomeNs "https://example.com")`.
 
-From information encoded with precise types, it derives automatically serialization and deserialization. It can also work with generic representations such as records.
+From information encoded with precise types, it automatically derives encoders and decoders. It can also work with generic representations such as records.
 
 ### Speed and robustness
 
@@ -298,7 +319,7 @@ MkDecoded {getDecoded = Jwt {header = Header {alg = HS512 (MkSecret {reveal = "M
 
 ```
 
-While the structure of the JWT can be inferred when signing - this obviously is not the case when decoding. `decodeByteString` can't possibly know what you are going to extract from the token, so you need to give it the expected type. It can simply be _type-alias_ like in the example above. Based on this, the correct deserialization is dervied. If something goes wrong an exception will be thrown, which you can catch and inspect. 
+While the structure of the JWT can be inferred when signing - this obviously is not the case when decoding. `decodeByteString` can't possibly know what you are going to extract from the token, so you need to give it the expected type. It can simply be _type-alias_ like in the example above. Based on this, the correct decoder is dervied. If something goes wrong an exception will be thrown, which you can catch and inspect. 
 
 The result of this function is an instance of `Decoded` type. The JWT stucture wrapped in this type is guaranteed to be correct representation of the requested type with its signature checked according to your algorithm and secret/key.
 
@@ -358,7 +379,7 @@ Right (UserClaims {userId = 5a7c5cdd-3909-456b-9dd2-6ba84bfeeb25, userName = "Jo
 
 ## Supported types
 
-Currently, serialization and deserialization of the following types is supported:
+The following types are currently supported:
   * ByteString
   * String
   * Text
@@ -366,13 +387,38 @@ Currently, serialization and deserialization of the following types is supported
   * Libjwt.JsonByteString (for working with pure JSON)
   * Bool
   * Libjwt.NumericDate (POSIX timestamps)
-  * Libjwt.Flag (for automatic serialization of simple sum types)
+  * Libjwt.Flag (for simple sum types)
   * Int
   * UUID
   * UTCTime, ZonedTime, LocalTime, Day
   * Maybes of the above types
   * lists of the above types and lists of tuples created from them
   * NonEmpty lists of the above types
+  
+### Flags
+
+Flags provide a way to automatically encode and decode simple sum types.
+
+```haskell
+data Scope = Login | Extended | UserRead | UserWrite | AccountRead | AccountWrite
+  deriving stock (Show, Eq, Generic)
+
+instance AFlag Scope
+```
+
+Now, you can use `Flag Scope` in JWT claims, e.g.
+
+```haskell
+mkPayload' UserClaims {..} = jwtPayload
+  (withIssuer "myApp" <> withRecipient "https://myApp.com" <> setTtl 300)
+  ( #user_name ->> userName
+  , #is_root ->> isRoot
+  , #user_id ->> userId
+  , #created ->> createdAt
+  , #accounts ->> accounts
+  , #scope ->> Flag Login
+  )
+```
 
 ## Benchmarks
 

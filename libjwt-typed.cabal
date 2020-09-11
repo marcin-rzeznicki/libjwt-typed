@@ -1,8 +1,31 @@
 cabal-version:       2.4
 name:                libjwt-typed
 version:             0.1
-synopsis:            A typesafe and idiomatic Haskell wrapper over libjwt
-description:         A typesafe and idiomatic Haskell wrapper over libjwt
+synopsis:            A Haskell implementation of JSON Web Token (JWT)
+description:         A Haskell implementation of JSON Web Token (JWT)
+                     .
+                     = Key features
+                     .
+                     == Type-safety
+                     .
+                     Above Haskell standard type-safety, the library keeps track of public and private claim names and types. There are no user-facing @HashMap@s in this library! 
+                     A type of a JWT token might be: @Jwt '["user_name" ->> Text, "is_root" ->> Bool, "user_id" ->> UUID, "created" ->> UTCTime, "accounts" ->> NonEmpty (UUID, Text)] ('SomeNs "https://example.com")@.
+
+                     From information encoded with precise types, it automatically derives encoders and decoders. It can also work with generic representations such as records.
+                     .
+                     == Speed and robustness
+                     .
+                     @libjwt-typed@ uses [libjwt](https://github.com/benmcollins/libjwt) for low-level functionality. @libjwt@ delegates cryptographic work to either @GnuTLS@ or @OpenSSL@.
+                     This way, not only the most performance-sensitive features work lightning fast, they are also extremely reliable.
+                     Besides, the library does not depend on any JSON library like @aeson@, but it implements the necessary JSON processing in C via [jsmn](https://github.com/zserge/jsmn) - which makes it even faster. Benchmarking shows that it can be over 10 times faster than other Haskell JWT libraries.
+                     .
+                     == Ease of use
+                     .
+                     The library is designed for frictionless use.
+                     It can be easily extended, e.g. to add support for new types or to use custom JSON encodings compatible with other libraries you may already use in your project. Most instances can be derived automatically.
+                     The compilation errors are designed to be informational, i.e. you get @Claim "user_name" does not exist in this claim set@ from GHC, not some 3 page long instance resolution output.
+                     .
+                     Please see the full [README](https://github.com/marcin-rzeznicki/libjwt-typed) or browse the docs for more details.
 homepage:            https://github.com/marcin-rzeznicki/libjwt-typed
 bug-reports:         https://github.com/marcin-rzeznicki/libjwt-typed/issues
 license:             MPL-2.0
