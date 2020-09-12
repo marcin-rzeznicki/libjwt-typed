@@ -1,6 +1,6 @@
 # libjwt-typed
 
-[![Build status](https://img.shields.io/travis/marcin-rzeznicki/libjwt-typed.svg?logo=travis)](https://travis-ci.org/marcin-rzeznicki/libjwt-typed)
+[![Build status](https://travis-ci.com/marcin-rzeznicki/libjwt-typed.svg?branch=master)](https://travis-ci.org/marcin-rzeznicki/libjwt-typed)
 [![Hackage](https://img.shields.io/hackage/v/libjwt-typed.svg?logo=haskell)](https://hackage.haskell.org/package/libjwt-typed)
 [![Stackage Lts](http://stackage.org/package/libjwt-typed/badge/lts)](http://stackage.org/lts/package/libjwt-typed)
 [![Stackage Nightly](http://stackage.org/package/libjwt-typed/badge/nightly)](http://stackage.org/nightly/package/libjwt-typed)
