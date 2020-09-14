@@ -2,12 +2,244 @@
 --   License, v. 2.0. If a copy of the MPL was not distributed with this
 --   file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+{-# OPTIONS_HADDOCK not-home #-}
+
 {- |
 Copyright: (c) 2020 Marcin Rzeźnicki
 SPDX-License-Identifier: MPL-2.0
 Maintainer: Marcin Rzeźnicki <marcin.rzeznicki@gmail.com>
 
-A typesafe and idiomatic Haskell wrapper over libjwt
+The prelude for the library.
+
+= Creating a payload
+
+'Payload' consists of:
+
+    * registered claims: 'Iss', 'Sub', 'Aud', 'Jti', 'Exp', 'Nbf', 'Iat'
+    * private claims
+
+Private claims can be created from:
+
+    * "named" tuples (tuples with elements created via v'->>')
+    * records that are instances of 'ToPrivateClaims'
+
+Public claims can be created:
+
+    * directly, by setting fields of 'Payload' record
+    * via 'JwtBuilder'
+
+Payload keeps track of names and types of private claims as a part of its type. 
+In all the examples below the type is: 
+
+@
+'Payload' '["user_name" t'->>' String, "is_root" t'->>' Bool, "user_id" t'->>' Int] ''NoNs'
+@
+
+== From "named" tuples
+
+@
+{-# LANGUAGE OverloadedLabels #-}
+mkPayload currentTime =
+    let now = 'fromUTC' currentTime
+    in  def
+            { iss           = 'Iss' (Just "myApp")
+            , aud           = 'Aud' ["https://myApp.com"]
+            , iat           = 'Iat' (Just now)
+            , exp           = 'Exp' (Just $ now `plusSeconds` 300)
+            , privateClaims = 'toPrivateClaims'
+                                  ( #user_name v'->>' "John Doe"
+                                  , #is_root v'->>' False
+                                  , #user_id v'->>' (12345 :: Int)
+                                  )
+            }
+@
+
+== From records
+
+@
+data UserClaims = UserClaims { user_name :: String
+                             , is_root :: Bool
+                             , user_id :: Int
+                             }
+  deriving stock (Eq, Show, Generic)
+
+instance 'ToPrivateClaims' UserClaims
+
+mkPayload currentTime =
+    let now = 'fromUTC' currentTime
+    in  def
+            { iss           = Iss (Just "myApp")
+            , aud           = Aud ["https://myApp.com"]
+            , iat           = Iat (Just now)
+            , exp           = Exp (Just $ now `plusSeconds` 300)
+            , privateClaims = 'toPrivateClaims'
+                              UserClaims { user_name = "John Doe"
+                                         , is_root = False
+                                         , user_id = 12345
+                                         }
+            }
+@
+
+== Using JwtBuilder
+
+If you prefer more "fluent" style, you might want to use 'jwtPayload' function
+
+@
+mkPayload = 'jwtPayload'
+   ('withIssuer' "myApp" <> 'withRecipient' "https://myApp.com" <> 'setTtl' 300)
+   UserClaims { user_name = "John Doe"
+              , is_root = False
+              , user_id = 12345
+              }
+@
+
+For the list of available "builders", please see the docs of "Libjwt.Payload" module.
+This methods relies on "Control.Monad.MonadTime" to get the current time.
+
+= Namespaces
+
+To ensure that private do not collide with claims from other resources, it is recommended to give them globally unique names . 
+This is often done through namespacing, i.e. prefixing the names with the URI of a resource you control. 
+This is handled entirely at the type-level. 
+
+As you may have noticed, 'Payload' types has a component of kind 'Namespace'. 
+It tracks the namespace assigned to private claims within the payload. If you change the last example to:
+
+@
+{-# LANGUAGE DataKinds #-}
+
+mkPayload' =
+  jwtPayload
+      (withIssuer "myApp" <> withRecipient "https://myApp.com" <> setTtl 300)
+    $ 'withNs'
+        ('Ns' @"https://myApp.com")
+        UserClaims 
+           { user_name = "John Doe"
+           , is_root = False
+           , user_id = 12345
+           }
+@
+
+, you'll notice that the type has changed to accomodate the namespace, becoming 
+
+@
+'Payload' '["user_name" t'->>' String, "is_root" t'->>' Bool, "user_id" t'->>' Int] (''SomeNs' "https://myApp.com")
+@
+
+Consequently, in the generated token /"user_id"/ becomes /"https://myApp.com/user_id"/ etc.
+
+= Signing
+
+Signing is the process of transforming the 'Jwt' structure with 'Payload' and 'Header' into a token with a cryptographic signature that can be sent over-the-wire.
+
+== Supported algorithms
+
+To sign a token, you need to choose the algorithm. 
+
++----------+---------------------------------------+
+|Algorithm |  Description                          | 
++==========+=======================================+
+|'HS256'   |  HMAC with SHA-256                    |
++----------+---------------------------------------+
+|'HS384'   |  HMAC with SHA-384                    |
++----------+---------------------------------------+
+|'HS512'   |  HMAC with SHA-512                    |
++----------+---------------------------------------+
+|'RS256'   |  RSASSA-PKCS1-v1_5 with SHA-256       |
++----------+---------------------------------------+
+|'RS384'   |  RSASSA-PKCS1-v1_5 with SHA-384       |
++----------+---------------------------------------+
+|'RS512'   |  RSASSA-PKCS1-v1_5 with SHA-512       |
++----------+---------------------------------------+
+|'ES256'   |  ECDSA with curve P-256 and SHA-256   |
++----------+---------------------------------------+
+|'ES384'   |  ECDSA with curve P-384 and SHA-384   |
++----------+---------------------------------------+
+|'ES512'   |  ECDSA with curve P-521 and SHA-512   |
++----------+---------------------------------------+
+
+The complete example: 
+
+@
+{-# LANGUAGE OverloadedStrings #-}
+
+hmac512 :: 'Alg'
+hmac512 =
+    'HS512'
+        "MjZkMDY2OWFiZmRjYTk5YjczZWFiZjYzMmRjMzU5NDYyMjMxODBjMTg3ZmY5OTZjM2NhM2NhN2Mx\\
+        \\YzFiNDNlYjc4NTE1MjQxZGI0OWM1ZWI2ZDUyZmMzZDlhMmFiNjc5OWJlZTUxNjE2ZDRlYTNkYjU5\\
+        \\Y2IwMDZhYWY1MjY1OTQgIC0K"
+
+token :: IO ByteString
+token = fmap ('getToken' . 'sign' hmac512) $ jwtPayload
+    (withIssuer "myApp" <> withRecipient "https://myApp.com" <> setTtl 300)
+    UserClaims { user_name = "John Doe"
+               , is_root = False
+               , user_id = 12345
+               }
+@
+
+= Decoding
+
+Decoding is a 2-step process. /Step 1/ is to take the token, validate its signature and check its structural correctness 
+(is it valid JSON, is it a valid JWT object, does it have all the claims?). If any of these tests fail,
+we don't have a valid token and an exception is thrown (see 'SomeDecodeException'). In /step 2/, the decoded token is validated -
+has it expired? does it have the right issuer? etc. The resulting value is of type @'ValidationNEL' 'ValidationFailure' ('Validated' MyJwtType)@
+
+It is __important__ to only work with valid tokens (if a token is not validated, it may be addressed to someone else or may be 2 weeks old),
+so the rest of your program should only accept @'Validated' MyJwt@, not @'Decoded' MyJwt@, which is the result of step 1.
+
+@
+type MyJwt
+    = 'Jwt'
+          '["userId" t'->>' UUID, "userName" t'->>' Text, "isRoot" t'->>' Bool, "createdAt" t'->>' UTCTime, "accounts" t'->>' NonEmpty UUID]
+          ''NoNs'
+
+decodeAndValidate :: IO ('ValidationNEL' 'ValidationFailure' ('Validated' MyJwt))
+decodeAndValidate = 'jwtFromByteString' settings mempty hmac512 =<< token
+  where
+    settings = 'Settings' { leeway = 5, appName = Just "https://myApp.com" }
+@
+
+By default only validations mandated by the RFC are performed:
+
+    * check /exp/ claim against the current time,
+    * check /nbf/ claim against the current time,
+    * check /aud/ claim against 'appName'
+
+You can add your own validations:
+
+@
+decodeAndValidate :: IO ('ValidationNEL' 'ValidationFailure' ('Validated' MyJwt))
+decodeAndValidate = 'jwtFromByteString' settings ('checkIssuer' "myApp" <> 'checkClaim' not #is_root) hmac512 =<< token
+  where
+    settings = 'Settings' { leeway = 5, appName = Just "https://myApp.com" }
+@
+
+If for some reason, you do not want to validate a token, but only decode it, you can use 'decodeByteString'
+
+= Types supported in claims
+
+Currently, these types are supported:
+
+    * ByteString
+    * String
+    * Text
+    * 'ASCII'
+    * 'Libjwt.JsonByteString'
+    * Bool
+    * 'NumericDate'
+    * 'Flag'
+    * Int
+    * UUID
+    * UTCTime, ZonedTime, LocalTime, Day
+    * Maybes of the above type
+    * lists of the above types and lists of tuples created from them
+    * NonEmpty lists of the above types
+    
+If you want to support a different type, check out "Libjwt.Classes".
+If you want to work with aeson, check "Libjwt.JsonByteString"
+
 -}
 
 module Web.Libjwt
@@ -36,19 +268,19 @@ import           Libjwt.Flag                    ( Flag(..)
                                                 )
 import           Libjwt.Header
 import           Libjwt.Jwt                     ( Jwt(..)
-                                                , Encoded
-                                                , getToken
                                                 , sign
                                                 , signJwt
-                                                , Decoded
-                                                , getDecoded
-                                                , decodeString
-                                                , decodeByteString
-                                                , Validated
-                                                , getValid
-                                                , validateJwt
+                                                , Encoded
+                                                , getToken
                                                 , jwtFromString
                                                 , jwtFromByteString
+                                                , decodeString
+                                                , decodeByteString
+                                                , Decoded
+                                                , getDecoded
+                                                , validateJwt
+                                                , Validated
+                                                , getValid
                                                 )
 import           Libjwt.JwtValidation    hiding ( runValidation
                                                 , Valid

@@ -2,6 +2,8 @@
 --   License, v. 2.0. If a copy of the MPL was not distributed with this
 --   file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+{-# OPTIONS_HADDOCK show-extensions #-}
+
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -9,6 +11,13 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 
+-- | JWT encoding definition
+--   
+--   __This module can be considered internal to the library__
+--   Users should never need to implement the `Encode` typeclass or use any of the exported functions or types directly.
+--   You'll only need to know of `Encode` typeclass if you want to write a function polymorphic in the type of payloads. 
+--
+--   If you want to extend the types supported by the library, see "Libjwt.Classes"
 module Libjwt.Encoding
   ( EncodeResult
   , Encode(..)
@@ -38,6 +47,7 @@ import           Data.Proxy                     ( Proxy(..) )
 
 type EncodeResult = JwtIO ()
 
+-- | Does not perform any action. It is used to encode things like empty lists or /Nothing/
 nullEncode :: b -> EncodeResult
 nullEncode = const $ return ()
 
@@ -54,7 +64,10 @@ type family EncoderDef a :: EncoderType where
   EncoderDef [a]            = 'Spec
   EncoderDef _              = 'Derived
 
+-- | Low-level definition of encoding @t@ values into JWT objects.
+--   It relies on the functions exported from "Libjwt.FFI.Jwt" to perform an /impure/ effect of /encoding/
 class ClaimEncoder t where
+  -- | Given a pointer to /jwt_t/, mutate the structure it points to to encode the value as a named claim
   encodeClaim :: String -> t -> JwtT -> EncodeResult
 
 instance (EncoderDef a ~ ty, ClaimEncoder' ty a) => ClaimEncoder a where
@@ -102,5 +115,9 @@ instance ClaimEncoder' 'Native JsonByteString where
 instance (JwtRep b a, EncoderDef b ~ ty, ClaimEncoder' ty b) => ClaimEncoder' 'Derived a where
   encodeClaim' _ name = encodeClaim' (Proxy :: Proxy ty) name . rep
 
+-- | Definition of encoding @c@ values into JWT objects.
+--   
+--   The only use for the user is probably to write a function that is polymorphic in the payload type.
 class Encode c where
+  -- | Perform the encoding as /impure/ action
   encode :: c -> JwtT -> EncodeResult

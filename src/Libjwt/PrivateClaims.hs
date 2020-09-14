@@ -3,6 +3,7 @@
 --   file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 {-# OPTIONS_GHC -Wno-missing-methods #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
 
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE DataKinds #-}
@@ -20,31 +21,47 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE ViewPatterns #-}
 
+-- | Collection of functions, types and type families that are needed to implement type-safe private claims.
+--
+--   This is essentially an implementation of /open product/ type as described in Sandy Maguire "Thinking with Types".
+--   The only difference to the book is that the implementation is backed by HashMap to make lookups by name easier.
+--   In addition, there are also 'FromPrivateClaims' and 'ToPrivateClaims' type-classes and 
+--   /view pattern/ ':<' to help create and deconstruct values.
 module Libjwt.PrivateClaims
-  ( Claim(..)
+  ( 
+    -- * Kinds
+    Claim(..)
   , type (->>)
-  , (->>)
-  , ClaimWitness
-  , testify
-  , ClaimName(..)
-  , claimNameVal
-  , PrivateClaims
-  , pattern (:<)
-  , type Empty
-  , nullClaims
-  , CanAdd
-  , addClaim
-  , (.:)
-  , CanGet
-  , LookupClaimType
-  , getClaim
-  , (.!)
   , Namespace(..)
   , KnownNamespace(..)
+  -- * Value-level counterparts
+  , ClaimName(..)
+  , claimNameVal
   , Ns(..)
+  , ClaimWitness
+  , testify
+  , (->>)
+  -- * Private claims type
+  , PrivateClaims
+  , type Empty
+  -- * Construction
+  , nullClaims
+  , addClaim
+  , (.:)
+  , CanAdd
+  , RestrictedName
+  -- * Lookup
+  , getClaim
+  , (.!)
+  , CanGet
+  , LookupClaimType
+  -- * Patern matching
+  , pattern (:<)
+  -- * Namespaces
   , withNs
   , someNs
   , noNs
+  -- * Conversions
   , ToPrivateClaims(..)
   , FromPrivateClaims(..)
   )
@@ -80,12 +97,25 @@ infix 6 ->>
 infixr 5 .:
 infixr 5 :<
 
+-- | Kind of claims
+--   
+--   A claim is made up of a type-level literal and a type (this is essentialy a /type-level tuple/ @(Symbol, *)@)
+--
+--   See v'->>' for constructing values
 data Claim (a :: Type) = Grant Symbol a
 
+-- | A convenient alias.
+--   Let's you write @'["claimName" ->> Int, "anotherName" ->> String]@ to indicate a list of types of kind 'Claim',
+--   instead of @'[Grant "claimName" Int, Grant "anotherName" String]@,
+--   
 type name ->> a = 'Grant name a
 
+-- | Kind of namespaces
+--
+--   These types represent a URL-like claim prefix
 data Namespace = NoNs | SomeNs Symbol
 
+-- | Class of 'Namespace' with known compile-time value
 class KnownNamespace (ns :: Namespace) where
   namespaceValue :: proxy ns -> Maybe String
 
@@ -103,31 +133,116 @@ fullClaimName p claimName =
 fullClaimName' :: forall ns name . (KnownNamespace ns, KnownSymbol name) => String
 fullClaimName' = fullClaimName (Proxy :: Proxy ns) $ symbolVal (Proxy :: Proxy name)
 
-data Ns (ns :: Symbol) = Ns
-
-instance (name ~ name') => IsLabel name (Ns name') where
-  fromLabel = Ns
-
-data Any = forall a . Any a
-newtype PrivateClaims (ts :: [Claim Type]) (ns :: Namespace) = PrivateClaims { unsafeClaimsMap :: HashMap String Any }
-
-type Empty = ('[] :: [Claim Type])
-
-nullClaims :: PrivateClaims Empty 'NoNs
-nullClaims = PrivateClaims HashMap.empty
-
+-- | Type-level literal representing a claim name
+--
+--   Can be used with @-XOverloadedLabels@
 data ClaimName (name :: Symbol) = ClaimName
 
 instance (name ~ name') => IsLabel name (ClaimName name') where
   fromLabel = ClaimName
 
+-- | Retrieves the string associated with 'ClaimName'
 claimNameVal :: forall name . KnownSymbol name => ClaimName name -> String
 claimNameVal _ = symbolVal (Proxy :: Proxy name)
 
+-- | Type-level literal representing a namespace
+--
+--   Can be used with @-XOverloadedLabels@ 
+--  (the limited label syntax makes this rarely possibble though, a more common use is to write /Ns @"https://example.com"/)
+data Ns (ns :: Symbol) = Ns
+
+instance (name ~ name') => IsLabel name (Ns name') where
+  fromLabel = Ns
+
+-- | Keeps the value of type @a@ and the name (type-level) with which it is associated
 newtype ClaimWitness (name :: Symbol) a = Witness { testify :: a }
 
+-- | Associates @name@ with a value
+--
+--   With @-XOverloadedLabels@
+--
+-- >>> :t #someName ->> True
+-- #someName ->> True :: ClaimWitness "someName" Bool
 (->>) :: ClaimName name -> a -> ClaimWitness name a
 _ ->> a = Witness a
+
+data Any = forall a . Any a
+
+-- | Container of named claims @ts@, possibly prefixed with some namespace @ns@
+--   
+--   For example @PrivateClaims '["string" t'->>' String, "int" t'->>' Int] ''NoNs'@ denotes a structure containing
+--   a String under the "string" key plus an int under the "int" key.
+--   There is no namespace, so the keys will not be prefixed by any prefix when serializing the structure
+newtype PrivateClaims (ts :: [Claim Type]) (ns :: Namespace) = PrivateClaims { unsafeClaimsMap :: HashMap String Any }
+
+type Empty = ('[] :: [Claim Type])
+
+-- | Empty claims
+nullClaims :: PrivateClaims Empty 'NoNs
+nullClaims = PrivateClaims HashMap.empty
+
+-- | Adds the claim to the container.
+--
+--   The claim can be added iff:
+--
+--       * there is no claim of the same @name@ in the container,
+--       * its name is not the name of a public claim (like /iss/ or /sub/)
+--
+--   Otherwise it is a compile-time error (see 'CanAdd' constraint)
+--   
+--   With @-XOverloadedLabels@
+--
+-- >>> addClaim #string "Value of claim" nullClaims
+-- (#string ->> "Value of claim")
+--
+--   With @-XTypeApplications@ and @-XDataKinds@
+--
+-- >>> addClaim (ClaimName @"string") "Value of claim" nullClaims
+-- (#string ->> "Value of claim")
+addClaim
+  :: forall name a ts ns
+   . CanAdd name ts
+  => ClaimName name
+  -> a
+  -> PrivateClaims ts ns
+  -> PrivateClaims (name ->> a : ts) ns
+addClaim _ a (PrivateClaims store) = PrivateClaims
+  $ HashMap.insert claimName (Any a) store
+  where claimName = symbolVal (Proxy :: Proxy name)
+
+-- | Alias for 'addClaim' (binds to the right)
+--
+--   With @-XOverloadedLabels@
+--
+-- >>> #string ->> "Value of claim" .: nullClaims
+-- (#string ->> "Value of claim")
+(.:)
+  :: forall name a ts ns
+   . CanAdd name ts
+  => ClaimWitness name a
+  -> PrivateClaims ts ns
+  -> PrivateClaims (name ->> a : ts) ns
+(Witness a) .: pc = addClaim ClaimName a pc
+
+-- | Constraint specifying when a claim named @n@ can be added to the list of claims @ns@
+--
+--   Satisfied iff:
+--
+--       * @n@ is a type-level literal,
+--       * in the names of @ns@ claims there is no @n@ (uniqueness),
+--       * @n@ is not one of the restricted names (see 'RestrictedName')
+--
+-- >>> :kind! CanAdd "name" '["n1" ->> Int, "n2" ->> String]
+-- CanAdd "name" '["n1" ->> Int, "n2" ->> String] :: Constraint
+-- = (GHC.TypeLits.KnownSymbol "name", () :: Constraint,
+--   () :: Constraint)
+--
+-- >>> :kind! CanAdd "n1" '["n1" ->> Int, "n2" ->> String]
+-- CanAdd "n1" '["n1" ->> Int, "n2" ->> String] :: Constraint
+-- = (GHC.TypeLits.KnownSymbol "n1", () :: Constraint,
+--   (TypeError ...))
+type family CanAdd n ns :: Constraint where
+  CanAdd n ns = (KnownSymbol n, DisallowRestrictedName (RestrictedName n) n, RequireUniqueName (UniqueName n ns) n)
 
 type family UniqueName (name :: Symbol) (ts :: [Claim Type]) :: Bool where
   UniqueName _ '[]           = 'True
@@ -156,26 +271,64 @@ type family DisallowRestrictedName (isRestricted :: Bool) (name :: Symbol) :: Co
       'Text " is the name of the registered claim (it is exposed as a field that must be set directly or use JwtBuilder)"
     )
 
-type family CanAdd n ns :: Constraint where
-  CanAdd n ns = (KnownSymbol n, DisallowRestrictedName (RestrictedName n) n, RequireUniqueName (UniqueName n ns) n)
+unsafeLookup :: String -> PrivateClaims ts ns -> p
+unsafeLookup claimName pc = unAny $ unsafeClaimsMap pc ! claimName
+  where unAny (Any a) = unsafeCoerce a
 
-addClaim
-  :: forall name a ts ns
-   . CanAdd name ts
+-- | Looks up the claim value in the container.
+--
+--   Value can be retrieved if proven to exists in the container.
+--   Otherwise it is a compile-time error (see 'CanGet' constraint)
+--   
+--   With @-XOverloadedLabels@
+--
+-- >>> getClaim #bool $ #string ->> "Value of claim" .: #bool ->> False .: nullClaims
+-- False
+getClaim
+  :: forall name ts ns
+   . CanGet name ts
   => ClaimName name
-  -> a
   -> PrivateClaims ts ns
-  -> PrivateClaims (name ->> a : ts) ns
-addClaim _ a (PrivateClaims store) = PrivateClaims
-  $ HashMap.insert claimName (Any a) store
-  where claimName = symbolVal (Proxy :: Proxy name)
+  -> LookupClaimType name ts
+getClaim _ = unsafeLookup name where name = symbolVal (Proxy :: Proxy name)
+{-# INLINE getClaim #-}
 
-(.:) :: forall name a ts ns
-      . CanAdd name ts
-     => ClaimWitness name a
-     -> PrivateClaims ts ns
-     -> PrivateClaims (name ->> a : ts) ns
-(Witness a) .: pc = addClaim ClaimName a pc
+-- | Alias for 'getClaim' (container goes first)
+--
+--   With @-XOverloadedLabels@
+--
+-- >>> (#string ->> "Value of claim" .: #bool ->> False .: nullClaims) .! #bool
+-- False
+(.!)
+  :: forall name ts ns
+   . CanGet name ts
+  => PrivateClaims ts ns
+  -> ClaimName name
+  -> LookupClaimType name ts
+pc .! name = getClaim name pc
+
+-- | Constraint specifying when a claim named @n@ can be looked up in the list of claims @ns@
+--
+--   Satisfied iff @ns@ contains a claim named @n@ and @n@ is a type-level literal
+--
+-- >>> :kind! CanGet "n1" '["n1" ->> Int, "n2" ->> String]
+-- CanGet "n1" '["n1" ->> Int, "n2" ->> String] :: Constraint
+-- = (GHC.TypeLits.KnownSymbol "n1", () :: Constraint)
+--
+-- >>> :kind! CanGet "n" '["n1" ->> Int, "n2" ->> String]
+-- CanGet "n" '["n1" ->> Int, "n2" ->> String] :: Constraint
+-- = (GHC.TypeLits.KnownSymbol "n", (TypeError ...))
+type family CanGet n ns :: Constraint where
+  CanGet n ns = (KnownSymbol n, RequireExists (NameExists n ns) n)
+
+-- | Looks up the type associated with @name@ in the @'[n1 t'->>' a, n2 t'->>' b, ...]@ pairs list. Gets stuck if @name@ is not in @ts@
+--
+-- >>> :kind! LookupClaimType "n1" '["n1" ->> Int, "n2" ->> String]
+-- LookupClaimType "n1" '["n1" ->> Int, "n2" ->> String] :: *
+-- = Int
+type family LookupClaimType (name :: Symbol) (ts :: [Claim Type]) :: Type where
+  LookupClaimType n (n ->> a : _) = a
+  LookupClaimType n (_ : rest)    = LookupClaimType n rest
 
 type family NameExists (name :: Symbol) (ts :: [Claim Type]) :: Bool where
   NameExists _ '[]           = 'False
@@ -186,44 +339,6 @@ type family RequireExists (exists :: Bool) (name :: Symbol) :: Constraint where
   RequireExists 'True  _ = ()
   RequireExists 'False n = TypeError ('Text "Claim " ':<>: 'ShowType n ':<>: 'Text " does not exist in this claim set")
 
-type family CanGet n ns :: Constraint where
-  CanGet n ns = (KnownSymbol n, RequireExists (NameExists n ns) n)
-
-type family LookupClaimType (name :: Symbol) (ts :: [Claim Type]) :: Type where
-  LookupClaimType n (n ->> a : _) = a
-  LookupClaimType n (_ : rest)    = LookupClaimType n rest
-
-unsafeLookup :: String -> PrivateClaims ts ns -> p
-unsafeLookup claimName pc = unAny $ unsafeClaimsMap pc ! claimName
-  where
-    unAny (Any a) = unsafeCoerce a
-
-getClaim
-  :: forall name ts ns
-   . CanGet name ts
-  => ClaimName name
-  -> PrivateClaims ts ns
-  -> LookupClaimType name ts
-getClaim _ = unsafeLookup name
- where
-  name = symbolVal (Proxy :: Proxy name)
-{-# INLINE getClaim #-}
-
-(.!) :: forall name ts ns
-      . CanGet name ts
-     => PrivateClaims ts ns
-     -> ClaimName name
-     -> LookupClaimType name ts
-pc .! name = getClaim name pc
-
-getHead
-  :: forall name a tl ns . (KnownSymbol name, KnownNamespace ns) => PrivateClaims (name ->> a : tl) ns -> (String, a)
-getHead pc = (fullClaimName (Proxy :: Proxy ns) claimName, claimValue)
- where
-  claimName = symbolVal (Proxy :: Proxy name)
-  claimValue = unsafeLookup claimName pc
-{-# INLINE getHead #-}
-
 getTail :: PrivateClaims (name ->> a : tl) ns -> PrivateClaims tl ns
 getTail = coerce
 
@@ -233,6 +348,7 @@ view pc = (a, tl)
    a = pc .! (ClaimName @name)
    tl = getTail pc
 
+-- | Extracts values from the container in the order in which they appear in the claim list
 pattern (:<) :: KnownSymbol name => a -> PrivateClaims tl ns -> PrivateClaims (name ->> a : tl) ns
 pattern head :< tail <- (view -> (head, tail))
 
@@ -247,6 +363,14 @@ someNs _ = coerce
 
 noNs :: PrivateClaims ts any -> PrivateClaims ts 'NoNs
 noNs = coerce
+
+getHead
+  :: forall name a tl ns . (KnownSymbol name, KnownNamespace ns) => PrivateClaims (name ->> a : tl) ns -> (String, a)
+getHead pc = (fullClaimName (Proxy :: Proxy ns) claimName, claimValue)
+ where
+  claimName = symbolVal (Proxy :: Proxy name)
+  claimValue = unsafeLookup claimName pc
+{-# INLINE getHead #-}
 
 instance (ts ~ Empty, ns ~ 'NoNs) => Default (PrivateClaims ts ns) where
   def = nullClaims
@@ -347,6 +471,7 @@ instance Eq (PrivateClaims Empty any) where
 instance (Eq a, KnownSymbol name, Eq (PrivateClaims tl ns)) => Eq (PrivateClaims (name ->> a : tl) ns) where
   pc1 == pc2 = pc1 .! (ClaimName @name) == pc2 .! (ClaimName @name) && getTail pc1 == getTail pc2
 
+-- | Conversion from @a@ values to 'PrivateClaims'
 class ToPrivateClaims a where
   type Claims a :: [Claim Type]
   type Claims a = ClaimsFromRecord (Rep a)
@@ -354,6 +479,7 @@ class ToPrivateClaims a where
   type OutNs a :: Namespace
   type OutNs a = 'NoNs
 
+  -- | Convert to claims
   toPrivateClaims :: a -> PrivateClaims (Claims a) (OutNs a)
 
   default toPrivateClaims
@@ -365,7 +491,9 @@ class ToPrivateClaims a where
     => a -> PrivateClaims (Claims a) (OutNs a)
   toPrivateClaims = genericToPrivateClaims . from
 
+-- | Conversion from @PrivateClaims@ to @a@ values
 class FromPrivateClaims a where
+  -- | Convert from claims
   fromPrivateClaims :: ts ~ Claims a => PrivateClaims ts ns -> a
 
   default fromPrivateClaims 

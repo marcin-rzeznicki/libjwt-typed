@@ -2,6 +2,8 @@
 --   License, v. 2.0. If a copy of the MPL was not distributed with this
 --   file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+{-# OPTIONS_HADDOCK show-extensions #-}
+
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE DerivingStrategies #-}
@@ -34,10 +36,46 @@ import           GHC.TypeLits
 
 import           Text.Casing
 
+-- | Wrapper. @a@ is encoded and decoded as 'AFlag'
+--
+--   Flags provide a way to automatically encode and decode simple sum types.
+--
+-- @
+-- data Scope = Login | Extended | UserRead | UserWrite | AccountRead | AccountWrite
+--  deriving stock (Show, Eq, Generic)
+--
+-- instance AFlag Scope
+--
+-- mkPayload = jwtPayload
+--     (withIssuer "myApp" <> withRecipient "https://myApp.com" <> setTtl 300)
+--     ( #user_name ->> "John Doe"
+--     , #is_root ->> False
+--     , #user_id ->> (12345 :: Int)
+--     , #scope ->> Flag Login
+--     )
+-- @
 newtype Flag a = Flag { getFlag :: a }
   deriving stock (Show, Eq)
 
+-- | Types that can be used as /flags/ . That is, they support converting to/from ASCII values,
+--   for example, simple sum types are good candidates that can even be generically derived
+--
+--
+-- @
+-- data Scope = Login | Extended | UserRead | UserWrite | AccountRead | AccountWrite
+--  deriving stock (Show, Eq, Generic)
+--
+-- instance AFlag Scope
+-- @
+--
+-- >>> getFlagValue UserWrite
+-- ASCII {getASCII = "userWrite"}
+--
+-- >>> setFlagValue (ASCII "userWrite") :: Maybe Scope
+-- Just UserWrite
 class AFlag a where
+  {-# MINIMAL getFlagValue, setFlagValue #-}
+
   getFlagValue :: a -> ASCII
   default getFlagValue :: (Generic a, GFlag (Rep a)) => a -> ASCII
   getFlagValue = ggetFlagValue . from

@@ -2,11 +2,14 @@
 --   License, v. 2.0. If a copy of the MPL was not distributed with this
 --   file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+{-# OPTIONS_HADDOCK show-extensions #-}
+
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE ForeignFunctionInterface #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MagicHash #-}
 
+-- | Functions in this module call C libraries to process JWT
 module Libjwt.FFI.Jwt
   ( JwtIO
   , unsafePerformJwtIO
@@ -82,9 +85,11 @@ import           GHC.Exts
 
 import           System.IO.Unsafe               ( unsafePerformIO )
 
+-- | IO restricted to calling /libjwt/ and /jsmn/ tokenizer
 newtype JwtIO a = JIO (IO a)
  deriving newtype (Functor, Applicative, Monad, MonadThrow, MonadCatch)
 
+-- | Wrapped pointer to /jwt_t/
 newtype JwtT = JwtT (ForeignPtr JwtT)
 
 unsafePerformJwtIO :: JwtIO a -> a
@@ -320,6 +325,12 @@ foreign import ccall unsafe "jwt.h jwt_decode" c_jwt_decode :: Ptr PJwtT -> CStr
 
 type PJsmnTokT = Ptr JsmnTokT
 
+-- | Low-level representation of JSON tokenization. Tokens are an exact representation of the underlying JSON, ie no conversions or unescaping is performed.
+--
+--   The only exception is @JsStr@ which is already unquoted 
+--   (@JsStr@ value is the string between the first and last quotation marks of the corresponding JSON string).
+--
+--   JSON objects are not parsed at all, but presented as one byte string (@JsBlob@).
 data JsonToken = JsStr ByteString
                | JsNum ByteString
                | JsTrue

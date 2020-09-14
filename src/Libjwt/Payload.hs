@@ -2,6 +2,8 @@
 --   License, v. 2.0. If a copy of the MPL was not distributed with this
 --   file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+{-# OPTIONS_HADDOCK show-extensions #-}
+
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -11,6 +13,8 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
+
+-- | JWT payload structure and convenient builders.
 
 module Libjwt.Payload
   ( Payload(..)
@@ -54,14 +58,15 @@ import           Data.UUID                      ( UUID )
 
 import           Prelude                 hiding ( exp )
 
-data Payload pc ns = ClaimsSet { iss :: Iss
-                               , sub :: Sub
-                               , aud :: Aud
-                               , exp :: Exp
-                               , nbf :: Nbf
-                               , iat :: Iat
-                               , jti :: Jti
-                               , privateClaims :: PrivateClaims pc ns
+-- | JWT payload representation
+data Payload pc ns = ClaimsSet { iss :: Iss -- ^ /iss/ (Issuer) claim
+                               , sub :: Sub -- ^ /sub/ (Subject) claim
+                               , aud :: Aud -- ^ /aud/ (Audience) claim
+                               , exp :: Exp -- ^ /exp/ (Expiration Time) claim
+                               , nbf :: Nbf -- ^ /nbf/ (Not Before) claim
+                               , iat :: Iat -- ^ /iat/ (Issued At) claim
+                               , jti :: Jti -- ^ /jti/ (JWT ID) claim
+                               , privateClaims :: PrivateClaims pc ns -- ^ private claims
                                }
 deriving stock instance Show (PrivateClaims pc ns) => Show (Payload pc ns)
 deriving stock instance Eq (PrivateClaims pc ns) => Eq (Payload pc ns)
@@ -103,6 +108,78 @@ instance Decode (PrivateClaims pc ns) => Decode (Payload pc ns) where
 newtype JwtBuilder any1 any2 = JwtBuilder { steps :: Ap (Reader UTCTime) (Endo (Payload any1 any2)) }
   deriving newtype (Semigroup, Monoid)
 
+-- | Creates a payload from the builder and the value representing private claims
+--
+--   For example:
+-- 
+-- @
+-- jwtPayload
+--   ('withIssuer' "myApp" <> 'withRecipient' "https://myApp.com" <> 'setTtl' 300)
+--   ( #userName v'->>' "John Doe"
+--   , #isRoot v'->>' False
+--   , #userId v'->>' (12345 :: Int)
+--   )
+-- @
+-- 
+--  The resulting payload will be the equivalent of:
+-- 
+-- > {
+-- >   "aud": [
+-- >     "https://myApp.com"
+-- >   ],
+-- >   "exp": 1599499073,
+-- >   "iat": 1599498773,
+-- >   "isRoot": false,
+-- >   "iss": "myApp",
+-- >   "userId": 12345,
+-- >   "userName": "JohnDoe"
+-- > }
+--
+-- An identical payload can be constructed from the following record type:
+--
+-- @
+-- data MyClaims = MyClaims { userName :: String
+--                          , isRoot :: Bool
+--                          , userId :: Int
+--                          }
+--   deriving stock (Eq, Show, Generic)
+-- 
+-- instance 'ToPrivateClaims' UserClaims
+-- 
+-- jwtPayload
+--   ('withIssuer' "myApp" <> 'withRecipient' "https://myApp.com" <> 'setTtl' 300)
+--   MyClaims { userName = "John Doe"
+--            , isRoot   = False
+--            , userId   = 12345
+--            }
+-- @
+-- 
+--  If you want to assign a /namespace/ to your private claims, you can do:
+-- 
+-- @
+-- jwtPayload
+--     (withIssuer "myApp" <> withRecipient "https://myApp.com" <> setTtl 300)
+--   $ 'withNs'
+--       ('Ns' @"https://myApp.com")
+--       MyClaims
+--         { userId    = 12345
+--         , userName  = "JohnDoe"
+--         , isRoot    = False
+--         }
+-- @
+--  The resulting payload will be the equivalent of:
+-- 
+-- > {
+-- >   "aud": [
+-- >     "https://myApp.com"
+-- >   ],
+-- >   "exp": 1599499073,
+-- >   "iat": 1599498773,
+-- >   "https://myApp.com/isRoot": false,
+-- >   "iss": "myApp",
+-- >   "https://myApp.com/userId": 12345,
+-- >   "https://myApp.com/userName": "JohnDoe"
+-- > }
 jwtPayload
   :: (MonadTime m, ToPrivateClaims a, Claims a ~ b, OutNs a ~ ns)
   => JwtBuilder b ns
@@ -120,46 +197,60 @@ stepWithCurrentTime
   -> JwtBuilder any1 any2
 stepWithCurrentTime f = JwtBuilder . Ap $ fmap (Endo . f) now
 
+-- | Sets /iss/ claim
 withIssuer :: String -> JwtBuilder any1 any2
 withIssuer issuer = step $ \p -> p { iss = Iss $ Just issuer }
 
+-- | Sets /iss/ claim
 issuedBy :: String -> JwtBuilder any1 any2
 issuedBy = withIssuer
 
+-- | Sets /sub/ claim
 withSubject :: String -> JwtBuilder any1 any2
 withSubject subject = step $ \p -> p { sub = Sub $ Just subject }
 
+-- | Sets /sub/ claim
 issuedTo :: String -> JwtBuilder any1 any2
 issuedTo = withSubject
 
+-- | Appends one item to /aud/ claim
 withRecipient :: String -> JwtBuilder any1 any2
 withRecipient recipient = step $ \p -> p { aud = Aud [recipient] <> aud p }
 
+-- | Appends one item to /aud/ claim
 intendedFor :: String -> JwtBuilder any1 any2
 intendedFor = withRecipient
 
+-- | Sets /aud/ claim
 withAudience :: [String] -> JwtBuilder any1 any2
 withAudience audience = step $ \p -> p { aud = Aud audience }
 
+-- | Sets /exp/ claim
 expiresAt :: UTCTime -> JwtBuilder any1 any2
 expiresAt time = step $ \p -> p { exp = Exp $ Just $ fromUTC time }
 
+-- | Sets /nbf/ claim
 notBefore :: UTCTime -> JwtBuilder any1 any2
 notBefore time = step $ \p -> p { nbf = Nbf $ Just $ fromUTC time }
 
+-- | Sets /nbf/ claim to 'currentTime'
 notBeforeNow :: JwtBuilder any1 any2
 notBeforeNow = stepWithCurrentTime $ \t p -> p { nbf = Nbf $ Just t }
 
+-- | Sets /nbf/ claim to 'currentTime' plus the argument
 notUntil :: NominalDiffTime -> JwtBuilder any1 any2
 notUntil s =
   stepWithCurrentTime $ \t p -> p { nbf = Nbf $ Just $ t `plusSeconds` s }
 
+-- | Sets /iat/ claim to 'currentTime'
 issuedNow :: JwtBuilder any1 any2
 issuedNow = stepWithCurrentTime $ \t p -> p { iat = Iat $ Just t }
 
+-- | Sets /iat/ claim to 'currentTime' and /exp/ claim to 'currentTime' plus the argument
 setTtl :: NominalDiffTime -> JwtBuilder any1 any2
 setTtl ttl = issuedNow <> stepWithCurrentTime
   (\t p -> p { exp = Exp $ Just $ t `plusSeconds` ttl })
 
+-- | Sets /jti/ claim
 withJwtId :: UUID -> JwtBuilder any1 any2
 withJwtId jwtId = step $ \p -> p { jti = Jti $ Just jwtId }

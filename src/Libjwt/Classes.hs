@@ -2,17 +2,156 @@
 --   License, v. 2.0. If a copy of the MPL was not distributed with this
 --   file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+{-# OPTIONS_HADDOCK show-extensions #-}
+
 {-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
 
-
+-- | The classes in this module are responsible for encoding and decoding values into JWT objects.
+--
+-- = Encoding
+--
+--   The encoders are divided into three groups:
+--
+--       * /Native/ - types: ByteString, Bool, Int, NumericDate and 'JsonByteString'.
+--         They are encoded by simply calling the appropriate FFI function
+--       * /Derived/ - types for which there is an instance of 'JwtRep'.
+--         They are converted via 'rep' (transitively) to something we know how to encode
+--       * /Specialized/ - 'Maybe' and lists
+--
+-- == JwtRep typeclass and derived encoders
+--
+--   This typeclass converts a value to its encodable representation. E.g.,
+--   to encode 'UUID' we first convert it to something we know how to encode (ByteString).
+--     
+-- @
+-- instance 'JwtRep' ByteString UUID where
+--   rep = UUID.toASCIIBytes
+-- @
+--
+--   This is sufficent to encode any single 'UUID' as 'ByteString' is natively supported.
+--   This is an example of /derived/ encoder that calls 'rep' and then uses a different encoder (native) to perform the actual encoding.
+--   Native encoders automatically take care of converting values to JSON format (escaping, quoting, UTF-8 encoding etc).
+--
+--   You can use the same method to extend the library to __support your type__.
+--
+-- @
+-- newtype UserName = Un { toText :: Text }
+--  deriving stock (Show, Eq)
+--
+-- instance 'JwtRep' Text UserName where
+--  rep   = toText
+--  unRep = Just . Un   
+-- @
+-- 
+--   But there is an easier way. Just use /deriving/ clause
+--
+-- @
+-- newtype UserName = Un { toText :: Text }
+--  deriving stock (Show, Eq)
+--  deriving newtype ('JwtRep' ByteString)
+-- @
+--
+-- == JsonBuilder and lists
+--
+--  To encode values such as lists, a different strategy has to be used. 
+--  Because JWT values have to be in JSON format and there is no native support for more complex data structures (such as JSON arrays)
+--  we have to do the conversion ourselves. For this we must know how to encode the value as a __JSON value__
+--
+--  This is the role of 'JsonBuilder' typeclass.
+--  You must provide its instance if you want to be able to __encode lists of values of a custom type__.
+--
+--  If you already have a 'JwtRep' instance, the default implementation (use 'JsonBuilder' of the 'rep') should be fine
+--
+-- @
+-- instance 'JsonBuilder' UserName
+-- @
+-- 
+--  or
+--
+-- @
+-- newtype UserName = Un { toText :: Text }
+--  deriving stock (Show, Eq)
+--  deriving newtype ('JwtRep' ByteString, 'JsonBuilder')
+-- @
+--
+-- = Decoding
+--
+--   The decoders are similarily divided into three groups:
+--
+--       * /Native/ - types: ByteString, Bool, Int, NumericDate and 'JsonByteString'.
+--         Decoded in C
+--       * /Derived/ - types for which a 'JwtRep' instance exists.
+--         They are extracted via 'unRep' (transitively) from something we could decode
+--       * /Specialized/ - Lists
+--
+-- == JwtRep typeclass
+--
+--   'JwtRep' also knows how to go backwards - from the JWT representation to, maybe, a value. To complete the 'UUID' example
+--     
+-- @
+-- instance 'JwtRep' ByteString UUID where
+--   rep = 'UUID.toASCIIBytes'
+--   unRep = 'UUID.fromASCIIBytes'
+-- @
+--
+--   /Derived/ decoder will first try to parse a byteString from JSON, and then convert it via 'unRep' to a UUID.
+--   Each of these steps can fail - the failure will manifest itself as "Libjwt.Exceptions.MissingClaim" or
+--   @Nothing@ if all you want is @Maybe UUID@
+--
+--   And of course, 'JwtRep' of @UserName@ handles decoding the same way as described.
+--
+-- == JsonParser and lists
+--
+--  'JsonParser' performs the opposite role of 'JsonBuilder' during decoding. It is used for extracting values
+--  out of JSON arrays
+--
+--  You must provide its instance if you want to be able to __decode lists of values of a custom type__.
+--
+--  And again - the default implementation (@unRep <=< jsonParser@) should be fine
+--
+-- @
+-- instance 'JsonParser' UserName
+-- @
+-- 
+--  or
+--
+-- @
+-- newtype UserName = Un { toText :: Text }
+--  deriving stock (Show, Eq)
+--  deriving newtype ('JwtRep' ByteString, 'JsonBuilder', 'JsonParser')
+-- @
+--
+-- = Integration with aeson
+--
+--  If you want to work with more complex objects as claims (e.g. lists of records) or
+--  you just want to integrate this library with your existing code that uses /aeson/ - it's simple
+-- 
+-- @
+-- data Account = MkAccount { account_name :: Text, account_id :: UUID }
+--   deriving stock (Show, Eq, Generic)
+-- 
+-- instance FromJSON Account
+-- instance ToJSON Account
+-- 
+-- instance 'JwtRep' 'JsonByteString' Account where
+--   rep   = Json . encode
+--   unRep = decode . toJson
+-- 
+-- instance 'JsonBuilder' Account
+-- instance 'JsonParser' Account
+-- @
+--
+--  'JsonByteString' is for cases where you already have your claims correctly represented as JSON,
+--  so you can use /aeson/ (or any other method) to create 'JsonByteString'.
 module Libjwt.Classes
   ( JwtRep(..)
   , JsonBuilder(..)
   , JsonParser(..)
+  , JsonToken(..)
   )
 where
 
@@ -83,9 +222,14 @@ import           Data.Word                      ( Word16
                                                 , Word8
                                                 )
 
-
+-- | Convert to/from suitable JWT representation. 
+--
+--   If an instance of this typeclass exists for type @b@, then JWT encoder and decoder can be derived for that type.
+--   This derived encoder/decoder will use the encoder/decoder of @a@ and perform the convertions through this typeclass.
 class JwtRep a b | b -> a where
+  -- | Convert to JWT
   rep :: b -> a
+  -- | Convert from JWT, returning @Nothing@ if unable
   unRep :: a -> Maybe b
 
 instance JwtRep ByteString String where
@@ -134,7 +278,13 @@ instance AFlag a => JwtRep ASCII (Flag a) where
   rep   = getFlagValue
   unRep = setFlagValue
 
+-- | Convert to a valid JSON representation
+--
+--   This typeclass will be used to encode a list of @t@ values (or a list of tuples whose element is of type @t@)
 class JsonBuilder t where
+  -- | Encode @t@ as JSON.
+  -- 
+  --   Must generate a valid JSON value: take care of quoting, escaping, UTF-8 encoding etc.
   jsonBuilder :: t -> Builder
 
   default jsonBuilder :: (JwtRep a t, JsonBuilder a) => t -> Builder
@@ -238,7 +388,11 @@ optimizedEscapeString enc = quoteString . E.primMapListBounded escape
       $   (fromIntegral . ord)
       >$< uEscape
 
+-- | Convert from JSON representation
+--
+--   This typeclass will be used to decode a list of @a@ values (or a list of tuples whose element is of type @a@)
 class JsonParser a where
+  -- | Decode @a@ from a JSON token.
   jsonParser :: JsonToken -> Maybe a
 
   default jsonParser :: (JwtRep t a, JsonParser t) => JsonToken -> Maybe a

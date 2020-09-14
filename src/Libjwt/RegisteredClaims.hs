@@ -2,9 +2,12 @@
 --   License, v. 2.0. If a copy of the MPL was not distributed with this
 --   file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+{-# OPTIONS_HADDOCK show-extensions #-}
+
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
+-- | Representation of registered claims
 module Libjwt.RegisteredClaims
   ( Iss(..)
   , Sub(..)
@@ -29,17 +32,20 @@ import           Data.Proxy
 
 import           Data.UUID                      ( UUID )
 
-
+-- | /iss/ (Issuer) claim
 newtype Iss = Iss (Maybe String)
   deriving stock (Show, Eq)
 
+-- | /sub/ (Subject) claim
 newtype Sub = Sub (Maybe String)
   deriving stock (Show, Eq)
 
+-- | /aud/ (Audience) claim
 newtype Aud = Aud [String]
   deriving stock (Show, Eq)
   deriving newtype (Semigroup, Monoid)
 
+-- | /exp/ (Expiration Time) claim
 newtype Exp = Exp (Maybe NumericDate)
   deriving stock (Show, Eq)
 
@@ -48,12 +54,15 @@ instance Ord Exp where
   Exp Nothing  <= Exp _        = False
   Exp (Just a) <= Exp (Just b) = a <= b
 
+-- | /nbf/ (Not Before) claim
 newtype Nbf = Nbf (Maybe NumericDate)
   deriving stock (Show, Eq, Ord)
 
+-- | /iat/ (Issued At) claim
 newtype Iat = Iat (Maybe NumericDate)
   deriving stock (Show, Eq, Ord)
 
+-- | /jti/ (JWT ID) claim
 newtype Jti = Jti (Maybe UUID)
   deriving stock (Show, Eq)
 

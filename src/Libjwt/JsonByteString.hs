@@ -18,6 +18,21 @@ import           Data.ByteString.Builder        ( Builder
                                                 )
 import qualified Data.ByteString.Lazy          as Lazy
 
+-- | Represents a string which is already in JSON format. 
+--
+--   Can be used for cases such as integration with /aeson/
+--   
+-- @
+-- data Account = MkAccount { account_name :: Text, account_id :: UUID }
+--   deriving stock (Show, Eq, Generic)
+-- 
+-- instance FromJSON Account
+-- instance ToJSON Account
+-- 
+-- instance 'JwtRep' 'JsonByteString' Account where
+--   rep   = Json . encode
+--   unRep = decode . toJson
+-- @
 newtype JsonByteString = Json { toJson :: Lazy.ByteString }
   deriving stock (Show, Eq)
 
