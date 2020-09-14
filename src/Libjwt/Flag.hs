@@ -74,8 +74,6 @@ newtype Flag a = Flag { getFlag :: a }
 -- >>> setFlagValue (ASCII "userWrite") :: Maybe Scope
 -- Just UserWrite
 class AFlag a where
-  {-# MINIMAL getFlagValue, setFlagValue #-}
-
   getFlagValue :: a -> ASCII
   default getFlagValue :: (Generic a, GFlag (Rep a)) => a -> ASCII
   getFlagValue = ggetFlagValue . from
