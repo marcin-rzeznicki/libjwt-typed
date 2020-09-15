@@ -444,9 +444,9 @@ When signing an "empty" token using `SHA-512` i.e. something like
 }
 ```
 
-| what  |                libjwt                 |               jose                | speedup |
-| :---: | :-----------------------------------: | :-------------------------------: | :-----: |
-| mean  | **9.920 μs**   (9.834 μs .. 10.01 μs) | 183.4 μs   (181.8 μs .. 185.4 μs) |   18x   |
+| what  |          libjwt          |         jose         | speedup |
+| :---: | :----------------------: | :------------------: | :-----: |
+| mean  | **9.05 μs**   (± 278 ns) | 166 μs   (± 5.74 μs) |   18x   |
 
 For more complex tokens i.e. something like
 ```json
@@ -470,31 +470,31 @@ For more complex tokens i.e. something like
 }
 ```
 
-| what  |                libjwt                 |               jose                | speedup |
-| :---: | :-----------------------------------: | :-------------------------------: | :-----: |
-| mean  | **38.71 μs**   (38.63 μs .. 38.84 μs) | 603.7 μs   (600.8 μs .. 606.6 μs) |   15x   |
+| what  |          libjwt           |         jose         | speedup |
+| :---: | :-----------------------: | :------------------: | :-----: |
+| mean  | **35.4 μs**   (± 89.9 ns) | 525 μs   (± 9.94 μs) |   14x   |
 
 
 When signing using elliptic-curve cryptography: `ECDSA256` 
 
-|      what      |                libjwt                 |               jose                | speedup |
-| :------------: | :-----------------------------------: | :-------------------------------: | :-----: |
-| mean (simple)  | **86.73 μs**   (86.65 μs .. 86.84 μs) | 1.310 ms   (1.307 ms .. 1.313 ms) |   15x   |
-| mean (complex) | **125.7 μs**   (125.5 μs .. 125.9 μs) | 1.711 ms   (1.709 ms .. 1.714 ms) |   13x   |
+|      what      |          libjwt          |         jose          | speedup |
+| :------------: | :----------------------: | :-------------------: | :-----: |
+| mean (simple)  | **77.3 μs**   (± 833 ns) | 1.18 ms   (± 21.6 μs) |   15x   |
+| mean (complex) | **112 μs**   (± 1.17 μs) | 1.54 ms   (± 22.0 μs) |   13x   |
 
 and `ECDSA512`
 
-|      what      |                libjwt                 |               jose                | speedup |
-| :------------: | :-----------------------------------: | :-------------------------------: | :-----: |
-| mean (simple)  | **303.6 μs**   (303.3 μs .. 303.8 μs) | 4.435 ms   (4.426 ms .. 4.444 ms) |   14x   |
-| mean (complex) | **342.2 μs**   (342.0 μs .. 342.5 μs) | 4.632 ms   (4.625 ms .. 4.641 ms) |   13x   |
+|      what      |          libjwt          |         jose          | speedup |
+| :------------: | :----------------------: | :-------------------: | :-----: |
+| mean (simple)  | **270 μs**   (± 4.74 μs) | 3.94 ms   (± 40.7 μs) |   14x   |
+| mean (complex) | **305 μs**   (± 4.19 μs) | 4.31 ms   (± 55.5 μs) |   14x   |
 
 And finally using the `RSA (RSASSA-PKCS1-v1_5 using SHA-512)`
 
-|      what      |              libjwt               |                 jose                  | speedup |
-| :------------: | :-------------------------------: | :-----------------------------------: | :-----: |
-| mean (simple)  | 1.576 ms   (1.576 ms .. 1.577 ms) | **1.156 ms**   (1.154 ms .. 1.159 ms) |  0.7x   |
-| mean (complex) | 1.627 ms   (1.625 ms .. 1.628 ms) | **1.542 ms**   (1.539 ms .. 1.547 ms) |  0.9x   |
+|      what      |        libjwt         |           jose            | speedup |
+| :------------: | :-------------------: | :-----------------------: | :-----: |
+| mean (simple)  | 1.40 ms   (± 13.2 μs) | **1.03 ms**   (± 11.9 μs) |  0.7x   |
+| mean (complex) | 1.44 ms   (± 15.0 μs) | **1.37 ms**   (± 15.8 μs) |  0.9x   |
 
 This is the only time `jose` is faster (congrats!). `libjwt-typed` is slower probably because it doesn't store private key parameters. This is something thaht needs to be improved.
 
@@ -504,31 +504,32 @@ Here going from a `ByteString` token back to the data is measured. When I say "t
 
 Using `HMAC512`
 
-|      what      |                libjwt                 |               jose                | speedup |
-| :------------: | :-----------------------------------: | :-------------------------------: | :-----: |
-| mean (simple)  | **10.28 μs**   (10.22 μs .. 10.33 μs) | 139.9 μs   (139.0 μs .. 140.7 μs) |   13x   |
-| mean (complex) | **68.20 μs**   (68.02 μs .. 68.35 μs) | 428.0 μs   (425.7 μs .. 429.7 μs) |   6x    |
+|      what      |          libjwt          |         jose         | speedup |
+| :------------: | :----------------------: | :------------------: | :-----: |
+| mean (simple)  | **9.29 μs**   (± 143 ns) | 128 μs   (± 3.40 μs) |   13x   |
+| mean (complex) | **60.0 μs**   (± 691 ns) | 390 μs   (± 6.12 μs) |   6x    |
 
 Using `ECDSA256`
 
-|      what      |                libjwt                 |               jose                | speedup |
-| :------------: | :-----------------------------------: | :-------------------------------: | :-----: |
-| mean (simple)  | **214.2 μs**   (213.8 μs .. 215.1 μs) | 1.405 ms   (1.402 ms .. 1.409 ms) |   6x    |
-| mean (complex) | **281.8 μs**   (281.5 μs .. 282.1 μs) | 1.717 ms   (1.714 ms .. 1.722 ms) |   6x    |
+|      what      |          libjwt          |         jose          | speedup |
+| :------------: | :----------------------: | :-------------------: | :-----: |
+| mean (simple)  | **189 μs**   (± 1.49 μs) | 1.26 ms   (± 14.4 μs) |   6x    |
+| mean (complex) | **244 μs**   (± 3.14 μs) | 1.54 ms   (± 15.4 μs) |   6x    |
 
 Using `ECDSA512`
 
-|      what      |                libjwt                 |               jose                | speedup |
-| :------------: | :-----------------------------------: | :-------------------------------: | :-----: |
-| mean (simple)  | **850.6 μs**   (847.6 μs .. 858.6 μs) | 5.045 ms   (5.038 ms .. 5.052 ms) |   5x    |
-| mean (complex) | **906.6 μs**   (906.4 μs .. 906.7 μs) | 5.280 ms   (5.275 ms .. 5.287 ms) |   5x    |
+|      what      |          libjwt          |         jose          | speedup |
+| :------------: | :----------------------: | :-------------------: | :-----: |
+| mean (simple)  | **749 μs**   (± 8.66 μs) | 4.45 ms   (± 75.4 μs) |   5x    |
+| mean (complex) | **804 μs**   (± 9.67 μs) | 4.71 ms   (± 53.8 μs) |   5x    |
 
 And finally `RSA`
 
-|      what      |                libjwt                 |               jose                | speedup |
-| :------------: | :-----------------------------------: | :-------------------------------: | :-----: |
-| mean (simple)  | **45.31 μs**   (45.17 μs .. 45.46 μs) | 151.5 μs   (150.3 μs .. 152.8 μs) |   3x    |
-| mean (complex) | **105.5 μs**   (105.4 μs .. 105.6 μs) | 433.4 μs   (431.3 μs .. 435.8 μs) |   4x    |
+|      what      |          libjwt          |         jose         | speedup |
+| :------------: | :----------------------: | :------------------: | :-----: |
+| mean (simple)  | **39.4 μs**   (± 618 ns) | 138 μs   (± 3.23 μs) |   3x    |
+| mean (complex) | **93.5 μs**   (± 777 ns) | 399 μs   (± 6.33 μs) |   4x    |
+
 
 ## Idea
 
