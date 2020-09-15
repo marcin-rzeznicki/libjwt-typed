@@ -1,4 +1,3 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 --   This Source Code Form is subject to the terms of the Mozilla Public
 --   License, v. 2.0. If a copy of the MPL was not distributed with this
 --   file, You can obtain one at http://mozilla.org/MPL/2.0/.
@@ -8,7 +7,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -22,7 +20,6 @@ module Web.Libjwt.Tutorial
 where
 
 import           Web.Libjwt
-import           Libjwt.Classes
 
 import           Control.Arrow                  ( left )
 import           Control.Exception              ( catch
@@ -132,19 +129,3 @@ decodeAndValidateFull =
   toUserClaims = fromPrivateClaims . privateClaims . payload . getValid
   onError (e :: SomeDecodeException) =
     return $ Left $ "Cannot decode token " ++ displayException e
-
--- Extending
-
-newtype UserName = Un { toText :: Text }
-  deriving stock (Show, Eq)
-  deriving newtype (JwtRep ByteString)
-
-instance JsonBuilder UserName
-instance JsonParser UserName
-
-token' :: IO ByteString
-token' = getToken . sign hmac512 <$> jwtPayload
-  (withIssuer "myApp" <> withRecipient "https://myApp.com" <> setTtl 300)
-  ( #user_name ->> Un "John Doe"
-  , #additional_names ->> [Un "Johnny Doe", Un "Doe"]
-  )
