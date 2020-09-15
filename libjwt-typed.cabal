@@ -142,8 +142,6 @@ test-suite libjwt-typed-test
                        quickcheck-instances >= 0.3.14
   ghc-options:         -threaded
                        -rtsopts
-                       -ddump-simpl-stats
-                       -ddump-to-file
                        "-with-rtsopts=-N -A64m -n4m -ki2k"
 
 benchmark libjwt-typed-benchmark
