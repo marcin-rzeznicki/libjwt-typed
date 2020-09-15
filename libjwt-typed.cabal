@@ -36,12 +36,15 @@ description:         A Haskell implementation of JSON Web Token (JWT)
 homepage:            https://github.com/marcin-rzeznicki/libjwt-typed
 bug-reports:         https://github.com/marcin-rzeznicki/libjwt-typed/issues
 license:             MPL-2.0
-license-file:        LICENSE
+license-files:       LICENSE
+                     src/cbits/jsmn/LICENSE
 author:              Marcin Rzeźnicki
 maintainer:          Marcin Rzeźnicki <marcin.rzeznicki@gmail.com>
 copyright:           2020 Marcin Rzeźnicki
 category:            Web
 build-type:          Simple
+extra-source-files:  src/cbits/jsmn/jsmn.h
+                     src/cbits/jsmn/Makefile
 extra-doc-files:     README.md
                      CHANGELOG.md
 tested-with:         GHC == 8.8.3
