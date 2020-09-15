@@ -100,8 +100,6 @@ infixr 5 :<
 -- | Kind of claims
 --   
 --   A claim is made up of a type-level literal and a type (this is essentialy a /type-level tuple/ @(Symbol, *)@)
---
---   See v'->>' for constructing values
 data Claim (a :: Type) = Grant Symbol a
 
 -- | A convenient alias.
@@ -117,6 +115,7 @@ data Namespace = NoNs | SomeNs Symbol
 
 -- | Class of 'Namespace' with known compile-time value
 class KnownNamespace (ns :: Namespace) where
+  -- | Convert namespace to a string (if any)
   namespaceValue :: proxy ns -> Maybe String
 
 instance KnownNamespace 'NoNs where
@@ -141,7 +140,7 @@ data ClaimName (name :: Symbol) = ClaimName
 instance (name ~ name') => IsLabel name (ClaimName name') where
   fromLabel = ClaimName
 
--- | Retrieves the string associated with 'ClaimName'
+-- | Retrieve the string associated with 'ClaimName'
 claimNameVal :: forall name . KnownSymbol name => ClaimName name -> String
 claimNameVal _ = symbolVal (Proxy :: Proxy name)
 
@@ -157,7 +156,7 @@ instance (name ~ name') => IsLabel name (Ns name') where
 -- | Keeps the value of type @a@ and the name (type-level) with which it is associated
 newtype ClaimWitness (name :: Symbol) a = Witness { testify :: a }
 
--- | Associates @name@ with a value
+-- | Associate @name@ with a value
 --
 --   With @-XOverloadedLabels@
 --
@@ -181,12 +180,12 @@ type Empty = ('[] :: [Claim Type])
 nullClaims :: PrivateClaims Empty 'NoNs
 nullClaims = PrivateClaims HashMap.empty
 
--- | Adds the claim to the container.
+-- | Insert the claim.
 --
---   The claim can be added iff:
+--   The claim can be safely added iff:
 --
 --       * there is no claim of the same @name@ in the container,
---       * its name is not the name of a public claim (like /iss/ or /sub/)
+--       * its name is not the name of any public claim (like /iss/ or /sub/)
 --
 --   Otherwise it is a compile-time error (see 'CanAdd' constraint)
 --   
@@ -275,7 +274,7 @@ unsafeLookup :: String -> PrivateClaims ts ns -> p
 unsafeLookup claimName pc = unAny $ unsafeClaimsMap pc ! claimName
   where unAny (Any a) = unsafeCoerce a
 
--- | Looks up the claim value in the container.
+-- | Look up the claim value associated with @name@.
 --
 --   Value can be retrieved if proven to exists in the container.
 --   Otherwise it is a compile-time error (see 'CanGet' constraint)
@@ -348,19 +347,22 @@ view pc = (a, tl)
    a = pc .! (ClaimName @name)
    tl = getTail pc
 
--- | Extracts values from the container in the order in which they appear in the claim list
+-- | Extract values from the container in the order in which they appear in the claim list
 pattern (:<) :: KnownSymbol name => a -> PrivateClaims tl ns -> PrivateClaims (name ->> a : tl) ns
 pattern head :< tail <- (view -> (head, tail))
 
 {-# COMPLETE (:<) :: PrivateClaims #-}
 
+-- | Convert to private claims with some namespace
 withNs
   :: ToPrivateClaims a => Ns ns -> a -> PrivateClaims (Claims a) ( 'SomeNs ns)
 withNs _ = coerce . toPrivateClaims
 
+-- | Set namespace
 someNs :: Ns ns -> PrivateClaims ts 'NoNs -> PrivateClaims ts ( 'SomeNs ns)
 someNs _ = coerce
 
+-- | Unset namespace
 noNs :: PrivateClaims ts any -> PrivateClaims ts 'NoNs
 noNs = coerce
 
@@ -471,7 +473,7 @@ instance Eq (PrivateClaims Empty any) where
 instance (Eq a, KnownSymbol name, Eq (PrivateClaims tl ns)) => Eq (PrivateClaims (name ->> a : tl) ns) where
   pc1 == pc2 = pc1 .! (ClaimName @name) == pc2 .! (ClaimName @name) && getTail pc1 == getTail pc2
 
--- | Conversion from @a@ values to 'PrivateClaims'
+-- | Class of types that can be converted to 'PrivateClaims'
 class ToPrivateClaims a where
   type Claims a :: [Claim Type]
   type Claims a = ClaimsFromRecord (Rep a)
@@ -491,7 +493,7 @@ class ToPrivateClaims a where
     => a -> PrivateClaims (Claims a) (OutNs a)
   toPrivateClaims = genericToPrivateClaims . from
 
--- | Conversion from @PrivateClaims@ to @a@ values
+-- | Class of types that can be constructed from @PrivateClaims@
 class FromPrivateClaims a where
   -- | Convert from claims
   fromPrivateClaims :: ts ~ Claims a => PrivateClaims ts ns -> a

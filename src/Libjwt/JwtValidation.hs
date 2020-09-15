@@ -116,7 +116,7 @@ newtype JwtValidation pc any = MkValidation { rules :: Ap (Reader ValidationEnv)
 instance Monoid (JwtValidation any1 any2) where
   mempty = validation $ const valid
 
--- | Runs checks against the @payload@.
+-- | Run checks against the @payload@.
 --
 --   The exact set of checks is: @ defaultValidationRules <> v @, where @v@ is passed to this function and @defaultValidationRules@ is:
 --
@@ -198,7 +198,7 @@ _checkNbf = using (leeway . settings)
     | t0 `plusSeconds` skew >= t1 = valid
     | otherwise                   = invalid $ TokenNotReady $ diffSeconds t1 t0
 
--- | check that /iat/ (if present) is not further than @maxAge@ from 'currentTime' (minus possible 'leeway'). Otherwise signal 'TokenTooOld'.
+-- | Check that /iat/ (if present) is not further than @maxAge@ from 'currentTime' (minus possible 'leeway'). Otherwise signal 'TokenTooOld'.
 checkAge
   :: NominalDiffTime -- ^ maxAge 
   -> JwtValidation any1 any2
@@ -211,7 +211,7 @@ checkAge maxAge = using (leeway . settings)
     | otherwise     = invalid $ TokenTooOld $ age - maxAge
     where age = diffSeconds t0 $ t1 `plusSeconds` skew
 
--- | check that /iat/ (if present) is after @time@. If false, signal @'InvalidClaim' "iat"@.
+-- | Check that /iat/ (if present) is after @time@. If false, signal @'InvalidClaim' "iat"@.
 checkIssuedAfter
   :: UTCTime -- ^ time
   -> JwtValidation any1 any2

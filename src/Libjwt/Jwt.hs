@@ -75,7 +75,7 @@ newtype Encoded t = MkEncoded { getToken :: ByteString -- ^ octets of the UTF-8 
                               }
   deriving stock (Show, Eq)
 
--- | Computes the encoded JWT value with the JWS Signature in the manner defined for the algorithm @alg@ .
+-- | Compute the encoded JWT value with the JWS Signature in the manner defined for the algorithm @alg@ .
 --   'typ' of the JWT 'Header' is set to "JWT"
 --
 --   Creates the serialized ouput, that is: 
@@ -87,7 +87,7 @@ sign
 sign alg payload =
   signJwt $ Jwt { header = Header { alg, typ = JWT }, payload }
 
--- | Computes the encoded JWT value with the JWS Signature in the manner defined for the algorithm 'alg' present in the JWT's 'header' .
+-- | Compute the encoded JWT value with the JWS Signature in the manner defined for the algorithm 'alg' present in the JWT's 'header' .
 --
 --   Creates the serialized ouput, that is: 
 --   @
@@ -115,8 +115,8 @@ decodeString
   -> m (Decoded (Jwt pc ns))
 decodeString alg = decodeByteString alg . C8.pack
 
--- | Parses the base64url-encoded representation to extract the serialized values for the components of the JWT.
---   Verifies that:
+-- | Parse the base64url-encoded representation to extract the serialized values for the components of the JWT.
+--   Verify that:
 --   
 --       (1) @token@ is a valid UTF-8 encoded representation of a completely valid JSON object,
 --       (1) input JWT signature matches,
@@ -187,7 +187,7 @@ safeJwtDecode alg token =
 newtype Validated t = MkValid { getValid :: t }
  deriving stock (Show, Eq)
 
--- | Accepts or rejects successfully decoded JWT value.
+-- | Accept or reject successfully decoded JWT value.
 --   In addition to the default rules mandated by the RFC, the application can add its own rules.
 --
 --   The default rules are:

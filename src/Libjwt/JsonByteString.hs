@@ -4,6 +4,7 @@
 
 {-# LANGUAGE DerivingStrategies #-}
 
+-- | JSON string
 module Libjwt.JsonByteString
   ( JsonByteString(..)
   , jsonFromStrict
@@ -29,7 +30,7 @@ import qualified Data.ByteString.Lazy          as Lazy
 -- instance FromJSON Account
 -- instance ToJSON Account
 -- 
--- instance 'JwtRep' 'JsonByteString' Account where
+-- instance 'Libjwt.Classes.JwtRep' 'JsonByteString' Account where
 --   rep   = Json . encode
 --   unRep = decode . toJson
 -- @

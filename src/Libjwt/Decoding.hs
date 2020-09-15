@@ -55,7 +55,7 @@ import           Data.Proxy
 newtype DecodeResult t = Result { getOptional :: JwtIO (Maybe t) }
   deriving (Functor, Applicative, Monad, Alternative) via (MaybeT JwtIO)
 
--- | Use pure value as 'Result'
+-- | Lift pure value
 hoistResult :: Maybe a -> DecodeResult a
 hoistResult = Result . pure
 
@@ -63,6 +63,7 @@ hoistResult = Result . pure
 getOrEmpty :: (Monoid a) => DecodeResult a -> JwtIO a
 getOrEmpty (Result x) = fromMaybe mempty <$> x
 
+-- | 'decodeClaim' through proxy
 decodeClaimProxied
   :: (ClaimDecoder t) => String -> proxy t -> JwtT -> DecodeResult t
 decodeClaimProxied name _ = decodeClaim name
@@ -86,8 +87,7 @@ type family DecoderDef a :: DecoderType where
   DecoderDef [a]            = 'Native
   DecoderDef _              = 'Derived
 
--- | Low-level definition of decoding @t@ values from JWT.
---   It relies on the functions exported from "Libjwt.FFI.Jwt" as decoding is mostly done natively.
+-- | Low-level definition of claims decoding.
 class ClaimDecoder t where
   -- | Given a pointer to /jwt_t/, try to decode the value of type @t@
   decodeClaim :: String -> JwtT -> DecodeResult t
@@ -139,7 +139,7 @@ instance (JwtRep b a, DecoderDef b ~ ty, ClaimDecoder' ty b) => ClaimDecoder' 'D
 type family Decodable t :: Constraint where
   Decodable t = ClaimDecoder' (DecoderDef t) t
 
--- | Definition of decoding @c@ values from JWT.
+-- | Definition of claims decoding.
 --   
 --   The only use for the user is probably to write a function that is polymorphic in the payload type
 class Decode c where

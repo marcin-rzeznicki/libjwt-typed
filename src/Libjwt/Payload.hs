@@ -15,7 +15,6 @@
 {-# LANGUAGE UndecidableInstances #-}
 
 -- | JWT payload structure and convenient builders.
-
 module Libjwt.Payload
   ( Payload(..)
   , withIssuer
@@ -108,7 +107,7 @@ instance Decode (PrivateClaims pc ns) => Decode (Payload pc ns) where
 newtype JwtBuilder any1 any2 = JwtBuilder { steps :: Ap (Reader UTCTime) (Endo (Payload any1 any2)) }
   deriving newtype (Semigroup, Monoid)
 
--- | Creates a payload from the builder and the value representing private claims
+-- | Create a payload from the builder and the value representing private claims
 --
 --   For example:
 -- 
@@ -167,6 +166,7 @@ newtype JwtBuilder any1 any2 = JwtBuilder { steps :: Ap (Reader UTCTime) (Endo (
 --         , isRoot    = False
 --         }
 -- @
+--
 --  The resulting payload will be the equivalent of:
 -- 
 -- > {
@@ -197,60 +197,60 @@ stepWithCurrentTime
   -> JwtBuilder any1 any2
 stepWithCurrentTime f = JwtBuilder . Ap $ fmap (Endo . f) now
 
--- | Sets /iss/ claim
+-- | Set /iss/ claim
 withIssuer :: String -> JwtBuilder any1 any2
 withIssuer issuer = step $ \p -> p { iss = Iss $ Just issuer }
 
--- | Sets /iss/ claim
+-- | Set /iss/ claim
 issuedBy :: String -> JwtBuilder any1 any2
 issuedBy = withIssuer
 
--- | Sets /sub/ claim
+-- | Set /sub/ claim
 withSubject :: String -> JwtBuilder any1 any2
 withSubject subject = step $ \p -> p { sub = Sub $ Just subject }
 
--- | Sets /sub/ claim
+-- | Set /sub/ claim
 issuedTo :: String -> JwtBuilder any1 any2
 issuedTo = withSubject
 
--- | Appends one item to /aud/ claim
+-- | Append one item to /aud/ claim
 withRecipient :: String -> JwtBuilder any1 any2
 withRecipient recipient = step $ \p -> p { aud = Aud [recipient] <> aud p }
 
--- | Appends one item to /aud/ claim
+-- | Append one item to /aud/ claim
 intendedFor :: String -> JwtBuilder any1 any2
 intendedFor = withRecipient
 
--- | Sets /aud/ claim
+-- | Set /aud/ claim
 withAudience :: [String] -> JwtBuilder any1 any2
 withAudience audience = step $ \p -> p { aud = Aud audience }
 
--- | Sets /exp/ claim
+-- | Set /exp/ claim
 expiresAt :: UTCTime -> JwtBuilder any1 any2
 expiresAt time = step $ \p -> p { exp = Exp $ Just $ fromUTC time }
 
--- | Sets /nbf/ claim
+-- | Set /nbf/ claim
 notBefore :: UTCTime -> JwtBuilder any1 any2
 notBefore time = step $ \p -> p { nbf = Nbf $ Just $ fromUTC time }
 
--- | Sets /nbf/ claim to 'currentTime'
+-- | Set /nbf/ claim to 'currentTime'
 notBeforeNow :: JwtBuilder any1 any2
 notBeforeNow = stepWithCurrentTime $ \t p -> p { nbf = Nbf $ Just t }
 
--- | Sets /nbf/ claim to 'currentTime' plus the argument
+-- | Set /nbf/ claim to 'currentTime' plus the argument
 notUntil :: NominalDiffTime -> JwtBuilder any1 any2
 notUntil s =
   stepWithCurrentTime $ \t p -> p { nbf = Nbf $ Just $ t `plusSeconds` s }
 
--- | Sets /iat/ claim to 'currentTime'
+-- | Set /iat/ claim to 'currentTime'
 issuedNow :: JwtBuilder any1 any2
 issuedNow = stepWithCurrentTime $ \t p -> p { iat = Iat $ Just t }
 
--- | Sets /iat/ claim to 'currentTime' and /exp/ claim to 'currentTime' plus the argument
+-- | Set /iat/ claim to 'currentTime' and /exp/ claim to 'currentTime' plus the argument
 setTtl :: NominalDiffTime -> JwtBuilder any1 any2
 setTtl ttl = issuedNow <> stepWithCurrentTime
   (\t p -> p { exp = Exp $ Just $ t `plusSeconds` ttl })
 
--- | Sets /jti/ claim
+-- | Set /jti/ claim
 withJwtId :: UUID -> JwtBuilder any1 any2
 withJwtId jwtId = step $ \p -> p { jti = Jti $ Just jwtId }

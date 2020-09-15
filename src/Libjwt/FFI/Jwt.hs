@@ -9,7 +9,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MagicHash #-}
 
--- | Functions in this module call C libraries to process JWT
+-- | Interface to C libraries 
 module Libjwt.FFI.Jwt
   ( JwtIO
   , unsafePerformJwtIO
@@ -85,11 +85,11 @@ import           GHC.Exts
 
 import           System.IO.Unsafe               ( unsafePerformIO )
 
--- | IO restricted to calling /libjwt/ and /jsmn/ tokenizer
+-- | IO restricted to calling /libjwt/ and /jsmn/
 newtype JwtIO a = JIO (IO a)
  deriving newtype (Functor, Applicative, Monad, MonadThrow, MonadCatch)
 
--- | Wrapped pointer to /jwt_t/
+-- | Wrapped pointer to /jwt_t/ with managed lifetime
 newtype JwtT = JwtT (ForeignPtr JwtT)
 
 unsafePerformJwtIO :: JwtIO a -> a
@@ -325,7 +325,7 @@ foreign import ccall unsafe "jwt.h jwt_decode" c_jwt_decode :: Ptr PJwtT -> CStr
 
 type PJsmnTokT = Ptr JsmnTokT
 
--- | Low-level representation of JSON tokenization. Tokens are an exact representation of the underlying JSON, ie no conversions or unescaping is performed.
+-- | Low-level representation of JSON tokenization. Tokens are an exact representation of the underlying JSON, ie no conversions or unescaping has been performed.
 --
 --   The only exception is @JsStr@ which is already unquoted 
 --   (@JsStr@ value is the string between the first and last quotation marks of the corresponding JSON string).

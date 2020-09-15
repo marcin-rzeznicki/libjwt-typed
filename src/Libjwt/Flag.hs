@@ -14,6 +14,7 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 
+-- | Support for simple sum types.
 module Libjwt.Flag
   ( Flag(..)
   , AFlag(..)
@@ -36,7 +37,7 @@ import           GHC.TypeLits
 
 import           Text.Casing
 
--- | Wrapper. @a@ is encoded and decoded as 'AFlag'
+-- | Value that is encoded and decoded as 'AFlag'
 --
 --   Flags provide a way to automatically encode and decode simple sum types.
 --
@@ -57,7 +58,7 @@ import           Text.Casing
 newtype Flag a = Flag { getFlag :: a }
   deriving stock (Show, Eq)
 
--- | Types that can be used as /flags/ . That is, they support converting to/from ASCII values,
+-- | Types that can be used as /flags/ . That is, they support conversion to/from ASCII values,
 --   for example, simple sum types are good candidates that can even be generically derived
 --
 --

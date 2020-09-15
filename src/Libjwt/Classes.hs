@@ -32,8 +32,8 @@
 --   rep = UUID.toASCIIBytes
 -- @
 --
---   This is sufficent to encode any single 'UUID' as 'ByteString' is natively supported.
 --   This is an example of /derived/ encoder that calls 'rep' and then uses a different encoder (native) to perform the actual encoding.
+--   This is sufficent to encode any single 'UUID' as 'ByteString' is natively supported.
 --   Native encoders automatically take care of converting values to JSON format (escaping, quoting, UTF-8 encoding etc).
 --
 --   You can use the same method to extend the library to __support your type__.
@@ -147,6 +147,11 @@
 --
 --  'JsonByteString' is for cases where you already have your claims correctly represented as JSON,
 --  so you can use /aeson/ (or any other method) to create 'JsonByteString'.
+--
+-- = Warning
+--
+--  Do not use @\NUL@ characters in strings you encode or decode with this library.
+--  Safety is not guaranteed (ie, may crash your program) due to the way /libjwt/ works.
 module Libjwt.Classes
   ( JwtRep(..)
   , JsonBuilder(..)
@@ -222,14 +227,14 @@ import           Data.Word                      ( Word16
                                                 , Word8
                                                 )
 
--- | Convert to/from suitable JWT representation. 
+-- | Conversion between @a@ and @b@ 
 --
---   If an instance of this typeclass exists for type @b@, then JWT encoder and decoder can be derived for that type.
+--   If an instance of this typeclass exists for a type @b@, then JWT encoder and decoder can be derived for that type.
 --   This derived encoder/decoder will use the encoder/decoder of @a@ and perform the convertions through this typeclass.
 class JwtRep a b | b -> a where
-  -- | Convert to JWT
+  -- | Convert @b@ to @a@
   rep :: b -> a
-  -- | Convert from JWT, returning @Nothing@ if unable
+  -- | Try to convert @a@ to @b@, returning @Nothing@ if unable
   unRep :: a -> Maybe b
 
 instance JwtRep ByteString String where
@@ -278,11 +283,11 @@ instance AFlag a => JwtRep ASCII (Flag a) where
   rep   = getFlagValue
   unRep = setFlagValue
 
--- | Convert to a valid JSON representation
+-- | Types that can be converted to a valid JSON representation
 --
 --   This typeclass will be used to encode a list of @t@ values (or a list of tuples whose element is of type @t@)
 class JsonBuilder t where
-  -- | Encode @t@ as JSON.
+  -- | Encode as JSON.
   -- 
   --   Must generate a valid JSON value: take care of quoting, escaping, UTF-8 encoding etc.
   jsonBuilder :: t -> Builder
@@ -388,11 +393,11 @@ optimizedEscapeString enc = quoteString . E.primMapListBounded escape
       $   (fromIntegral . ord)
       >$< uEscape
 
--- | Convert from JSON representation
+-- | Types that can be converted from JSON representation
 --
 --   This typeclass will be used to decode a list of @a@ values (or a list of tuples whose element is of type @a@)
 class JsonParser a where
-  -- | Decode @a@ from a JSON token.
+  -- | Decode from JSON token.
   jsonParser :: JsonToken -> Maybe a
 
   default jsonParser :: (JwtRep t a, JsonParser t) => JsonToken -> Maybe a

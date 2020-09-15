@@ -23,7 +23,7 @@ import           Data.String
 -- | Secret used in /HMAC/ algorithms.
 -- 
 --   According to RFC:
---   /A key of the same size as the hash ouyput (for instance, 256 bits for 'HS256') or larger MUST be used (...)/ 
+--   /A key of the same size as the hash output (for instance, 256 bits for 'HS256') or larger MUST be used (...)/ 
 --   - the user must ensure this property holds.
 --
 --   A secret is just an octet sequence e.g.
@@ -47,7 +47,7 @@ instance IsString Secret where
 --   /A key of size 2048 bits or larger MUST be used with these algorithms./ 
 --   - the user must ensure this property holds.
 --
---   Both keys are assumed to be strings representing /PEM-encoded/ keys
+--   Both fields are assumed to be strings representing /PEM-encoded/ keys
 --
 -- >
 -- >rsa2048KeyPair =

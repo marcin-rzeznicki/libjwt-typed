@@ -4,6 +4,7 @@
 
 {-# LANGUAGE DerivingStrategies #-}
 
+-- | POSIX seconds
 module Libjwt.NumericDate
   ( NumericDate(..)
   , fromUTC
@@ -41,7 +42,7 @@ fromUTC = fromPOSIX . utcTimeToPOSIXSeconds
 toPOSIX :: NumericDate -> POSIXTime
 toPOSIX (NumericDate s) = fromIntegral s
 
--- | Converts 'currentTime' to a number of seconds since 1970-01-01
+-- | Convert 'currentTime' to a number of seconds since 1970-01-01
 now :: (MonadTime m) => m NumericDate
 now = fromUTC <$> currentTime
 

@@ -4,6 +4,7 @@
 
 {-# LANGUAGE DerivingStrategies #-}
 
+-- | ASCII character string
 module Libjwt.ASCII
   ( ASCII(..)
   )
@@ -11,5 +12,5 @@ where
 
 -- | Represents a string consisting of only ASCII characters. 
 --   JWT encoding and decoding can safely skip conversion to/from UTF-8 for these values
-newtype ASCII = ASCII {getASCII :: String}
+newtype ASCII = ASCII { getASCII :: String}
   deriving stock (Eq, Ord, Read, Show)
