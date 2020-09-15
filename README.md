@@ -27,6 +27,7 @@ A Haskell implementation of [JSON Web Token (JWT)](https://jwt.io).
 1. [Benchmarks](#benchmarks)
    1. [Signing](#signing)
    1. [Decoding](#decoding)
+1. [Not implemented](#not-implemented)
 1. [Idea](#idea)
 
 ## Key features
@@ -530,6 +531,9 @@ And finally `RSA`
 | mean (simple)  | **39.4 μs**   (± 618 ns) | 138 μs   (± 3.23 μs) |   3x    |
 | mean (complex) | **93.5 μs**   (± 777 ns) | 399 μs   (± 6.33 μs) |   4x    |
 
+## Not implemented
+
+* JWT header can only contain `alg` and `typ` (everything else is ignored). This decision is partly because of the belief that you rarely need to complicate the header, and partly because of the limiation of `libjwt` which prevents the header from being checked before decoding (this is done in one step). For this reason, things like selecting keys based on the header cannot be easily implemented.
 
 ## Idea
 
