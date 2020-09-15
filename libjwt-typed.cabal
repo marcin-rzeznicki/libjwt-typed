@@ -25,6 +25,13 @@ description:         A Haskell implementation of JSON Web Token (JWT)
                      It can be easily extended, e.g. to add support for new types or to use custom JSON encodings compatible with other libraries you may already use in your project. Most instances can be derived automatically.
                      The compilation errors are designed to be informational, i.e. you get @Claim "user_name" does not exist in this claim set@ from GHC, not some 3 page long instance resolution output.
                      .
+                     = Installation
+                     .
+                     You must have [libjwt](https://github.com/benmcollins/libjwt) (preferrably the latest version) installed on your system and visible to the linker.
+                     .
+                     @libjwt-typed@ links to it at compile time. 
+                     You can configure @libjwt@ with @GnuTLS@ or @OpenSSL@
+                     .
                      Please see the full [README](https://github.com/marcin-rzeznicki/libjwt-typed) or browse the docs for more details.
 homepage:            https://github.com/marcin-rzeznicki/libjwt-typed
 bug-reports:         https://github.com/marcin-rzeznicki/libjwt-typed/issues
