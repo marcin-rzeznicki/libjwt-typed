@@ -21,13 +21,13 @@ matrix:
         - ghc-8.8.3   
         - libjansson-dev
         - libssl-dev
-  - env: GHCVER=8.10.1 STACK_YAML="$TRAVIS_BUILD_DIR/stack.nightly.yaml"
+  - env: GHCVER=8.10.2 STACK_YAML="$TRAVIS_BUILD_DIR/stack.nightly.yaml"
     addons:
       apt:
         sources:
         - sourceline: "ppa:hvr/ghc"
         packages:
-        - ghc-8.10.1
+        - ghc-8.10.2
         - libjansson-dev
         - libssl-dev 
         
