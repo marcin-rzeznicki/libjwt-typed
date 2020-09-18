@@ -10,11 +10,16 @@
 module Libjwt.Keys
   ( Secret(..)
   , RsaKeyPair(..)
+  , RsaPubKey(..)
   , EcKeyPair(..)
+  , EcPubKey(..)
+  , SigningKey(..)
+  , DecodingKey(..)
   )
 where
 
 import           Data.ByteString                ( ByteString )
+import qualified Data.ByteString               as ByteString
 
 import qualified Data.ByteString.UTF8          as UTF8
 
@@ -95,6 +100,9 @@ instance IsString Secret where
 data RsaKeyPair = FromRsaPem { privKey :: ByteString, pubKey :: ByteString }
   deriving stock (Show, Eq)
 
+newtype RsaPubKey = FromRsaPub { rsaPublicKey :: ByteString }
+  deriving stock (Show, Eq)
+
 -- | Elliptic curves parameters used in /ECDSA/ algorithms
 --
 --   According to RFC, the following curves are to be used:
@@ -132,3 +140,43 @@ data RsaKeyPair = FromRsaPem { privKey :: ByteString, pubKey :: ByteString }
 -- >   in  FromEcPem { ecPrivKey = private, ecPubKey = public }
 data EcKeyPair = FromEcPem { ecPrivKey :: ByteString, ecPubKey :: ByteString }
   deriving stock (Show, Eq)
+
+newtype EcPubKey = FromEcPub { ecPublicKey :: ByteString }
+  deriving stock (Show, Eq)
+
+class DecodingKey k where
+  getDecodingKey :: k -> ByteString
+
+instance DecodingKey Secret where
+  getDecodingKey = reveal
+
+instance DecodingKey RsaKeyPair where
+  getDecodingKey = pubKey
+
+instance DecodingKey RsaPubKey where
+  getDecodingKey = rsaPublicKey
+
+instance DecodingKey EcKeyPair where
+  getDecodingKey = ecPubKey
+
+instance DecodingKey EcPubKey where
+  getDecodingKey = ecPublicKey
+
+instance DecodingKey () where
+  getDecodingKey _ = ByteString.empty
+
+class DecodingKey k => SigningKey k where
+  getSigningKey :: k -> ByteString
+
+instance SigningKey Secret where
+  getSigningKey = reveal
+
+instance SigningKey RsaKeyPair where
+  getSigningKey = privKey
+
+instance SigningKey EcKeyPair where
+  getSigningKey = ecPrivKey
+
+instance SigningKey () where
+  getSigningKey _ = ByteString.empty
+

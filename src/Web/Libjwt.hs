@@ -244,6 +244,7 @@ If you want to work with aeson, check "Libjwt.JsonByteString"
 
 module Web.Libjwt
     ( module Libjwt.Jwt
+    , module Libjwt.Algorithms
     , module Libjwt.Exceptions
     , module Libjwt.Header
     , module Libjwt.Keys
@@ -259,6 +260,7 @@ module Web.Libjwt
     )
 where
 
+import           Libjwt.Algorithms              ( Algorithm(..) )
 import           Libjwt.ASCII                   ( ASCII(..) )
 import           Libjwt.Decoding                ( Decode )
 import           Libjwt.Encoding                ( Encode )
@@ -269,7 +271,7 @@ import           Libjwt.Flag                    ( Flag(..)
 import           Libjwt.Header
 import           Libjwt.Jwt                     ( Jwt(..)
                                                 , sign
-                                                , signJwt
+                                                , sign'
                                                 , Encoded
                                                 , getToken
                                                 , jwtFromString

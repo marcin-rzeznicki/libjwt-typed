@@ -2,14 +2,8 @@
 {-# LANGUAGE RecordWildCards #-}
 
 module Benchmarks.Jose
-  ( signSimple
-  , decodeSimple
-  , signCustomClaims
-  , decodeCustomClaims
-  , signCustomClaimsWithNs
-  , decodeCustomClaimsWithNs
-  , signComplexClaims
-  , decodeComplexClaims
+  ( signing
+  , decoding
   )
 where
 
@@ -60,6 +54,18 @@ import           Data.Time.Clock                ( UTCTime )
 
 import           Data.UUID                      ( UUID )
 import           Data.List.NonEmpty             ( NonEmpty )
+
+signing :: [(Alg, JWK) -> Benchmark]
+signing =
+  [signSimple, signCustomClaims, signCustomClaimsWithNs, signComplexClaims]
+
+decoding :: [(Alg, JWK) -> Benchmark]
+decoding =
+  [ decodeSimple
+  , decodeCustomClaims
+  , decodeCustomClaimsWithNs
+  , decodeComplexClaims
+  ]
 
 
 doSign :: Alg -> JWK -> ClaimsSet -> IO ByteString

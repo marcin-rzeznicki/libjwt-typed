@@ -13,7 +13,8 @@ module Algorithms
   )
 where
 
-import           Web.Libjwt                     ( Alg(..)
+import           Web.Libjwt                     ( Algorithm(..)
+                                                , Secret
                                                 , EcKeyPair(..)
                                                 , RsaKeyPair(..)
                                                 )
@@ -30,9 +31,9 @@ import qualified Data.ByteString.Char8         as C8
 
 import           Data.Maybe                     ( fromJust )
 
-hs512 :: Alg
+hs512 :: Algorithm Secret
 hs512 =
-  HS512
+  HMAC512
     "MjZkMDY2OWFiZmRjYTk5YjczZWFiZjYzMmRjMzU5NDYyMjMxODBjMTg3ZmY5OTZjM2NhM2NhN2Mx\
     \YzFiNDNlYjc4NTE1MjQxZGI0OWM1ZWI2ZDUyZmMzZDlhMmFiNjc5OWJlZTUxNjE2ZDRlYTNkYjU5\
     \Y2IwMDZhYWY1MjY1OTQgIC0K"
@@ -81,11 +82,11 @@ rsa2048KeyPair =
         ]
   in  FromRsaPem { privKey = private, pubKey = public }
 
-rs256 :: Alg
-rs256 = RS256 rsa2048KeyPair
+rs256 :: Algorithm RsaKeyPair
+rs256 = RSA256 rsa2048KeyPair
 
-rs512 :: Alg
-rs512 = RS512 rsa2048KeyPair
+rs512 :: Algorithm RsaKeyPair
+rs512 = RSA512 rsa2048KeyPair
 
 ecP256KeyPair :: EcKeyPair
 ecP256KeyPair =
@@ -104,8 +105,8 @@ ecP256KeyPair =
         ]
   in  FromEcPem { ecPrivKey = private, ecPubKey = public }
 
-es256 :: Alg
-es256 = ES256 ecP256KeyPair
+es256 :: Algorithm EcKeyPair
+es256 = ECDSA256 ecP256KeyPair
 
 ecP521KeyPair :: EcKeyPair
 ecP521KeyPair =
@@ -128,8 +129,8 @@ ecP521KeyPair =
         ]
   in  FromEcPem { ecPrivKey = private, ecPubKey = public }
 
-es512 :: Alg
-es512 = ES512 ecP521KeyPair
+es512 :: Algorithm EcKeyPair
+es512 = ECDSA512 ecP521KeyPair
 
 jwkHS512 :: (Jose.Alg, JWK)
 jwkHS512 =

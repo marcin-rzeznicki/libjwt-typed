@@ -109,6 +109,7 @@ library
                        Libjwt.Encoding
                        Libjwt.Decoding
                        Libjwt.Keys
+                       Libjwt.Algorithms
                        Libjwt.JsonByteString
                        Libjwt.FFI.Jwt
   other-modules:       Libjwt.FFI.Jsmn
