@@ -48,9 +48,9 @@ data UserClaims = UserClaims { userId :: UUID
 instance ToPrivateClaims UserClaims
 instance FromPrivateClaims UserClaims
 
-hmac512 :: Alg
+hmac512 :: Algorithm Secret
 hmac512 =
-  HS512
+  HMAC512
     "MjZkMDY2OWFiZmRjYTk5YjczZWFiZjYzMmRjMzU5NDYyMjMxODBjMTg3ZmY5OTZjM2NhM2NhN2Mx\
     \YzFiNDNlYjc4NTE1MjQxZGI0OWM1ZWI2ZDUyZmMzZDlhMmFiNjc5OWJlZTUxNjE2ZDRlYTNkYjU5\
     \Y2IwMDZhYWY1MjY1OTQgIC0K"

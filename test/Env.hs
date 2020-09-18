@@ -1,4 +1,5 @@
 {-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE GeneralisedNewtypeDeriving #-}
 {-# LANGUAGE NamedFieldPuns #-}
 
@@ -7,6 +8,7 @@ module Env where
 import           Web.Libjwt                     ( RsaKeyPair(..)
                                                 , EcKeyPair(..)
                                                 )
+
 
 import           Control.Arrow                  ( left )
 
@@ -144,8 +146,11 @@ testEcP521KeyPair =
 newtype TestEnv a = MkTest { runTest :: ReaderT UTCTime (Either SomeException) a }
   deriving newtype (Functor, Applicative, Monad, MonadTime, MonadThrow, MonadCatch)
 
+expectationOk :: Expectation
+expectationOk = pure ()
+
 pass :: TestEnv Expectation
-pass = MkTest (pure alwaysTrue) where alwaysTrue = pure ()
+pass = MkTest (pure expectationOk)
 
 presetTime :: UTCTime
 presetTime = posixSecondsToUTCTime 1595386660
@@ -179,5 +184,3 @@ runExpectationWithTime t0 =
             ++ displayException e
         )
     . runTestWithGivenTime t0
-
-

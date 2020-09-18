@@ -6,14 +6,7 @@
 {-# LANGUAGE TypeOperators #-}
 
 module Benchmarks.Libjwt
-  ( signSimple
-  , signCustomClaims
-  , signWithNs
-  , signComplexCustomClaims
-  , decodeSimple
-  , decodeCustomClaims
-  , decodeWithNs
-  , decodeComplexCustomClaims
+  ( signing, decoding
   )
 where
 
@@ -42,6 +35,22 @@ import           Data.UUID                      ( UUID )
 
 import           Prelude                 hiding ( exp )
 
+signing :: SigningKey k => [Algorithm k -> Benchmark]
+signing =
+  [ signSimple
+  , signCustomClaims
+  , signWithNs
+  , signComplexCustomClaims
+  ]
+
+decoding :: SigningKey k => [Algorithm k -> Benchmark]
+decoding =
+  [ decodeSimple
+  , decodeCustomClaims
+  , decodeWithNs
+  , decodeComplexCustomClaims
+  ]
+
 basePayload :: BenchEnv -> Payload Empty 'NoNs
 basePayload LocalEnv {..} = def { iss = Iss (Just "benchmarks")
                                 , aud = Aud ["https://example.com"]
@@ -52,31 +61,27 @@ basePayload LocalEnv {..} = def { iss = Iss (Just "benchmarks")
                                 }
 
 prepareToken
-  :: Encode (PrivateClaims pc ns)
-  => Alg
-  -> (Alg -> BenchEnv -> Jwt pc ns)
+  :: (SigningKey k, Encode (PrivateClaims pc ns))
+  => Algorithm k
+  -> (BenchEnv -> Payload pc ns)
   -> IO ByteString
-prepareToken a jwt = getToken . signJwt . jwt a <$> localEnv
+prepareToken a mkPayload = getToken . sign a . mkPayload <$> localEnv
 
 
 
 type SimpleJwt = Jwt Empty 'NoNs
 
-mkSimpleJwt :: Alg -> BenchEnv -> SimpleJwt
-mkSimpleJwt a e = Jwt { header = Header a JWT, payload = basePayload e }
-
-signSimple :: Alg -> Benchmark
+signSimple :: SigningKey k => Algorithm k -> Benchmark
 signSimple a = env localEnv $ bench "simple" . nf benchmark
-  where benchmark = getToken . signJwt . mkSimpleJwt a
+  where benchmark = getToken . sign a . basePayload
 
-decodeSimple :: Alg -> Benchmark
+decodeSimple :: SigningKey k => Algorithm k -> Benchmark
 decodeSimple a =
-  env (prepareToken a mkSimpleJwt) $ bench "simple" . whnfAppIO benchmark
+  env (prepareToken a basePayload) $ bench "simple" . whnfAppIO benchmark
  where
-  benchmark :: ByteString -> IO (ValidationNEL ValidationFailure SimpleJwt)
-  benchmark =
-    fmap (fmap getValid)
-      . jwtFromByteString validationSettings (checkIssuer "benchmarks") a
+  benchmark
+    :: ByteString -> IO (ValidationNEL ValidationFailure (Validated SimpleJwt))
+  benchmark = jwtFromByteString validationSettings (checkIssuer "benchmarks") a
 
 
 
@@ -85,27 +90,30 @@ type CustomJwt
       '["userName" ->> Text, "isRoot" ->> Bool, "clientId" ->> UUID, "created" ->> UTCTime, "scope" ->> Flag Scope]
       'NoNs
 
-mkCustomJwt :: Alg -> BenchEnv -> CustomJwt
-mkCustomJwt a e@LocalEnv {..} = Jwt
-  { header  = Header a JWT
-  , payload = (basePayload e)
-                { privateClaims = toPrivateClaims
-                                    ( #userName ->> shortPrintableText
-                                    , #isRoot ->> flipBit
-                                    , #clientId ->> uuid
-                                    , #created ->> currentTimeUtc
-                                    , #scope ->> Flag Login
-                                    )
-                }
+customPayload :: BenchEnv
+                   -> Payload
+                        '["userName" ->> Text, "isRoot" ->> Bool, "clientId" ->> UUID,
+                          "created" ->> UTCTime, "scope" ->> Flag Scope]
+                        'NoNs
+customPayload e@LocalEnv {..} = (basePayload e)
+  { privateClaims = toPrivateClaims
+                      ( #userName ->> shortPrintableText
+                      , #isRoot ->> flipBit
+                      , #clientId ->> uuid
+                      , #created ->> currentTimeUtc
+                      , #scope ->> Flag Login
+                      )
   }
 
-signCustomClaims :: Alg -> Benchmark
+signCustomClaims :: SigningKey k => Algorithm k -> Benchmark
 signCustomClaims a = env localEnv $ bench "custom-claims" . nf benchmark
-  where benchmark = getToken . signJwt . mkCustomJwt a
+  where benchmark = getToken . sign a . customPayload
 
-decodeCustomClaims :: Alg -> Benchmark
+decodeCustomClaims :: SigningKey k => Algorithm k -> Benchmark
 decodeCustomClaims a =
-  env (prepareToken a mkCustomJwt) $ bench "custom-claims" . whnfAppIO benchmark
+  env (prepareToken a customPayload)
+    $ bench "custom-claims"
+    . whnfAppIO benchmark
  where
   benchmark
     :: ByteString -> IO (ValidationNEL ValidationFailure (Validated CustomJwt))
@@ -118,28 +126,29 @@ type CustomJwtWithNs
       '["userName" ->> Text, "isRoot" ->> Bool, "clientId" ->> UUID, "created" ->> UTCTime, "scope" ->> Flag Scope]
       ( 'SomeNs "https://www.example.com/test")
 
-mkCustomJwtWithNs :: Alg -> BenchEnv -> CustomJwtWithNs
-mkCustomJwtWithNs a e@LocalEnv {..} = Jwt
-  { header  = Header a JWT
-  , payload = (basePayload e)
-                { privateClaims = toPrivateClaims $ withNs
-                                    (Ns @"https://www.example.com/test")
-                                    ( #userName ->> shortPrintableText
-                                    , #isRoot ->> flipBit
-                                    , #clientId ->> uuid
-                                    , #created ->> currentTimeUtc
-                                    , #scope ->> Flag Login
-                                    )
-                }
+customPayloadWithNs :: BenchEnv
+                         -> Payload
+                              '["userName" ->> Text, "isRoot" ->> Bool, "clientId" ->> UUID,
+                                "created" ->> UTCTime, "scope" ->> Flag Scope]
+                              ('SomeNs "https://www.example.com/test")
+customPayloadWithNs e@LocalEnv {..} = (basePayload e)
+  { privateClaims = toPrivateClaims $ withNs
+                      (Ns @"https://www.example.com/test")
+                      ( #userName ->> shortPrintableText
+                      , #isRoot ->> flipBit
+                      , #clientId ->> uuid
+                      , #created ->> currentTimeUtc
+                      , #scope ->> Flag Login
+                      )
   }
 
-signWithNs :: Alg -> Benchmark
+signWithNs :: SigningKey k => Algorithm k -> Benchmark
 signWithNs a = env localEnv $ bench "custom-claims-with-ns" . nf benchmark
-  where benchmark = getToken . signJwt . mkCustomJwtWithNs a
+  where benchmark = getToken . sign a . customPayloadWithNs
 
-decodeWithNs :: Alg -> Benchmark
+decodeWithNs :: SigningKey k => Algorithm k -> Benchmark
 decodeWithNs a =
-  env (prepareToken a mkCustomJwtWithNs)
+  env (prepareToken a customPayloadWithNs)
     $ bench "custom-claims-with-ns"
     . whnfAppIO benchmark
  where
@@ -155,37 +164,39 @@ type ComplexJwt
       '["user_name" ->> Text, "is_root" ->> Bool, "client_id" ->> UUID, "created" ->> UTCTime, "accounts" ->> NonEmpty (UUID, Text), "scopes" ->> [Flag Scope], "emails" ->> [String]]
       'NoNs
 
-mkComplexJwt :: Alg -> BenchEnv -> ComplexJwt
-mkComplexJwt a e@LocalEnv {..} = Jwt
-  { header  = Header a JWT
-  , payload = (basePayload e)
-                { privateClaims = toPrivateClaims
-                                    ( #user_name ->> shortPrintableText
-                                    , #is_root ->> flipBit
-                                    , #client_id ->> uuid
-                                    , #created ->> currentTimeUtc
-                                    , #accounts ->> accountList
-                                    , #scopes
-                                      ->> [ Flag Login
-                                          , Flag Extended
-                                          , Flag UserRead
-                                          , Flag UserWrite
-                                          , Flag AccountRead
-                                          , Flag AccountWrite
-                                          ]
-                                    , #emails ->> emailsList
-                                    )
-                }
+complexPayload :: BenchEnv
+                    -> Payload
+                         '["user_name" ->> Text, "is_root" ->> Bool, "client_id" ->> UUID,
+                           "created" ->> UTCTime, "accounts" ->> NonEmpty (UUID, Text),
+                           "scopes" ->> [Flag Scope], "emails" ->> [String]]
+                         'NoNs
+complexPayload e@LocalEnv {..} = (basePayload e)
+  { privateClaims = toPrivateClaims
+                      ( #user_name ->> shortPrintableText
+                      , #is_root ->> flipBit
+                      , #client_id ->> uuid
+                      , #created ->> currentTimeUtc
+                      , #accounts ->> accountList
+                      , #scopes
+                        ->> [ Flag Login
+                            , Flag Extended
+                            , Flag UserRead
+                            , Flag UserWrite
+                            , Flag AccountRead
+                            , Flag AccountWrite
+                            ]
+                      , #emails ->> emailsList
+                      )
   }
 
-signComplexCustomClaims :: Alg -> Benchmark
+signComplexCustomClaims :: SigningKey k => Algorithm k -> Benchmark
 signComplexCustomClaims a =
   env localEnv $ bench "complex-claims" . nf benchmark
-  where benchmark = getToken . signJwt . mkComplexJwt a
+  where benchmark = getToken . sign a . complexPayload
 
-decodeComplexCustomClaims :: Alg -> Benchmark
+decodeComplexCustomClaims :: SigningKey k => Algorithm k -> Benchmark
 decodeComplexCustomClaims a =
-  env (prepareToken a mkComplexJwt)
+  env (prepareToken a complexPayload)
     $ bench "complex-claims"
     . whnfAppIO benchmark
  where

@@ -74,39 +74,40 @@ spec = modifyArgs quickcheckArgs $ do
 
 prop_encode_decode_roundtrip_poly
   :: (Decode (PrivateClaims pc ns), Encode (PrivateClaims pc ns), Show a, Eq a)
-  => (Jwt pc ns -> a)
-  -> (a -> Jwt pc ns)
+  => (Payload pc ns -> a)
+  -> (a -> Payload pc ns)
   -> a
   -> Property
 prop_encode_decode_roundtrip_poly project embed a =
-  let jwt = embed a
-  in  left
-          displayException
-          (   decodeByteString (alg $ header jwt) (getToken $ signJwt jwt)
-          <&> project
-          .   getDecoded
-          )
-        === pure a
+  forAll genAlgorithm $ \(SomeAlgorithm algorithm) ->
+    left
+        displayException
+        (   decodeByteString algorithm (getToken $ sign algorithm $ embed a)
+        <&> project
+        .   payload
+        .   getDecoded
+        )
+      === pure a
 
-prop_encode_decode_roundtrip_reg_only :: Jwt Empty 'NoNs -> Property
+prop_encode_decode_roundtrip_reg_only :: Payload Empty 'NoNs -> Property
 prop_encode_decode_roundtrip_reg_only = prop_encode_decode_roundtrip_poly id id
 
 prop_encode_decode_roundtrip
-  :: Jwt
+  :: Payload
        '["intField" ->> Int, "dateField" ->> UTCTime, "textField" ->> JwtText, "optField" ->> Maybe JwtString, "arrayField" ->> [JwtText], "nonEmptyField" ->> NonEmpty ASCII]
        'NoNs
   -> Property
 prop_encode_decode_roundtrip = prop_encode_decode_roundtrip_poly id id
 
 prop_encode_decode_roundtrip_ns
-  :: Jwt
+  :: Payload
        '["dayField" ->> Day, "arrayField" ->> [Int], "stringField" ->> JwtString]
        ( 'SomeNs "https://example.com")
   -> Property
 prop_encode_decode_roundtrip_ns = prop_encode_decode_roundtrip_poly id id
 
 prop_encode_decode_rountrip_comp
-  :: Jwt
+  :: Payload
        '["user_name" ->> JwtText, "is_root" ->> Bool, "type" ->> Flag AccountType, "client_id" ->> UUID, "created" ->> UTCTime, "accounts" ->> NonEmpty (UUID, JwtText)]
        'NoNs
   -> Property
@@ -138,15 +139,9 @@ instance Arbitrary ClaimObj where
       <*> shrink createdAt
 
 prop_from_to_generic :: ClaimObj -> Property
-prop_from_to_generic claimObj = forAllBlind genHeader $ \header ->
-  prop_encode_decode_roundtrip_poly
-    (fromPrivateClaims . privateClaims . payload)
-    (\claimObj' -> Jwt
-      { header
-      , payload = def { privateClaims = toPrivateClaims claimObj' }
-      }
-    )
-    claimObj
+prop_from_to_generic = prop_encode_decode_roundtrip_poly
+  (fromPrivateClaims . privateClaims)
+  (\claimObj' -> def { privateClaims = toPrivateClaims claimObj' })
 
 data Account = MkAccount { account_name :: JwtText, account_id :: UUID }
   deriving stock (Show, Eq, Generic)
@@ -166,7 +161,7 @@ instance Arbitrary Account where
   shrink (MkAccount name id) = MkAccount <$> shrink name <*> shrink id
 
 prop_encode_decode_roundtrip_aeson
-  :: Jwt '["user_id" ->> Int, "accounts" ->> NonEmpty Account] 'NoNs
+  :: Payload '["user_id" ->> Int, "accounts" ->> NonEmpty Account] 'NoNs
   -> Property
 prop_encode_decode_roundtrip_aeson = prop_encode_decode_roundtrip_poly id id
 

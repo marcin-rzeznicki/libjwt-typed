@@ -2,12 +2,14 @@
 
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
@@ -16,9 +18,8 @@
 module Generators
   ( JwtString(..)
   , JwtText(..)
-  , genHeader
-  , genJwt
-  , shrinkJwt
+  , SomeAlgorithm(..)
+  , genAlgorithm
   )
 where
 
@@ -139,27 +140,6 @@ shrinkASCII = coerce . filter (notElem '\NUL') . shrink . getASCII
 instance Arbitrary a => Arbitrary (Flag a) where
   arbitrary = coerce $ arbitrary @a
 
-instance Arbitrary Alg where
-  arbitrary = genAlg
-
-genAlg :: Gen Alg
-genAlg = elements [hs256, hs512, rs256, rs512, es256, es384, es512, None]
- where
-  hs256 =
-    HS256
-      "MWNmYzExODA5OWFjOGM3NDNmMmM5Zjg5ZDc0YTM3M2VhMGNkMzA2MDY3ZjFhZDk5N2I3OTc5Yjdm\
-      \NDg3NDBkMiAgLQo"
-  hs512 =
-    HS512
-      "MjZkMDY2OWFiZmRjYTk5YjczZWFiZjYzMmRjMzU5NDYyMjMxODBjMTg3ZmY5OTZjM2NhM2NhN2Mx\
-      \YzFiNDNlYjc4NTE1MjQxZGI0OWM1ZWI2ZDUyZmMzZDlhMmFiNjc5OWJlZTUxNjE2ZDRlYTNkYjU5\
-      \Y2IwMDZhYWY1MjY1OTQgIC0K"
-  rs256 = RS256 E.testRsa2048KeyPair
-  rs512 = RS512 E.testRsa2048KeyPair
-  es256 = ES256 E.testEcP256KeyPair
-  es384 = ES384 E.testEcP384KeyPair
-  es512 = ES512 E.testEcP521KeyPair
-
 instance Arbitrary ValidationSettings where
   arbitrary = Settings <$> genLeeway <*> arbitrary
     where genLeeway = arbitrary `suchThat` (>= 0)
@@ -188,21 +168,43 @@ instance Arbitrary JwtText where
   shrink =
     shrinkMap (T . T.pack . correctJwtString) $ S . T.unpack . correctJwtText
 
-instance Arbitrary Header where
-  arbitrary = genHeader
+data SomeAlgorithm = forall k . (Show k, SigningKey k) => SomeAlgorithm (Algorithm k)
+deriving stock instance Show SomeAlgorithm
 
-genHeader :: Gen Header
-genHeader = Header <$> genAlg <*> pure JWT
+instance Arbitrary SomeAlgorithm where
+  arbitrary = genAlgorithm
 
-instance Arbitrary (PrivateClaims ts ns) => Arbitrary (Jwt ts ns) where
-  arbitrary = genJwt
-  shrink    = shrinkJwt
+genAlgorithm :: Gen SomeAlgorithm
+genAlgorithm = elements
+  [ SomeAlgorithm hs256
+  , SomeAlgorithm hs512
+  , SomeAlgorithm rs256
+  , SomeAlgorithm rs384
+  , SomeAlgorithm rs512
+  , SomeAlgorithm es256
+  , SomeAlgorithm es384
+  , SomeAlgorithm es512
+  , SomeAlgorithm AlgNone
+  ]
+ where
+  hs256 =
+    HMAC256
+      "MWNmYzExODA5OWFjOGM3NDNmMmM5Zjg5ZDc0YTM3M2VhMGNkMzA2MDY3ZjFhZDk5N2I3OTc5YjdmNDg3NDBkMiAgLQo"
+  hs512 =
+    HMAC512
+      "MjZkMDY2OWFiZmRjYTk5YjczZWFiZjYzMmRjMzU5NDYyMjMxODBjMTg3ZmY5OTZjM2NhM2NhN2Mx\
+          \YzFiNDNlYjc4NTE1MjQxZGI0OWM1ZWI2ZDUyZmMzZDlhMmFiNjc5OWJlZTUxNjE2ZDRlYTNkYjU5\
+          \Y2IwMDZhYWY1MjY1OTQgIC0K"
+  rs256 = RSA256 E.testRsa2048KeyPair
+  rs384 = RSA384 E.testRsa2048KeyPair
+  rs512 = RSA512 E.testRsa2048KeyPair
+  es256 = ECDSA256 E.testEcP256KeyPair
+  es384 = ECDSA384 E.testEcP384KeyPair
+  es512 = ECDSA512 E.testEcP521KeyPair
 
-genJwt :: Arbitrary (PrivateClaims ts ns) => Gen (Jwt ts ns)
-genJwt = Jwt <$> genHeader <*> arbitrary
-
-shrinkJwt :: Arbitrary (PrivateClaims pc ns) => Jwt pc ns -> [Jwt pc ns]
-shrinkJwt jwt = shrinkMap (\payload' -> jwt { payload = payload' }) payload jwt
+instance Arbitrary Typ where
+  arbitrary = frequency
+    [(16, pure JWT), (3, pure $ Typ Nothing), (1, pure $ Typ $ Just "some-typ")]
 
 instance Arbitrary (PrivateClaims ts ns) => Arbitrary (Payload ts ns) where
   arbitrary =

@@ -1,7 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE ExplicitForAll #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedLabels #-}
@@ -14,6 +13,7 @@ module Interop.JWTEncoding
 where
 
 import           Web.Libjwt
+import           Env                            ( expectationOk )
 import qualified Env                           as E
 import           Interop.JWTHelpers
 import           Libjwt.NumericDate             ( toPOSIX )
@@ -40,18 +40,14 @@ import qualified Web.JWT                       as JWT
 
 spec :: Spec
 spec = do
-  describe "HS256"
-    $ runTests
-    $ HS256
-        "MWNmYzExODA5OWFjOGM3NDNmMmM5Zjg5ZDc0YTM3M2VhMGNkMzA2MDY3ZjFhZDk5N2I3OTc5Yjdm\
-        \NDg3NDBkMiAgLQo"
-  xdescribe "none" $ runTests None -- JWT does not work at all with none
-  describe "RS256" $ runTests $ RS256 E.testRsa2048KeyPair
+  describe "HS256" $ runTests hmac256
+  xdescribe "none" $ runTests none -- JWT does not work at all with none
+  describe "RS256" $ runTests rsa256
 
-runTests :: Alg -> Spec
-runTests alg = sequence_ $ tests <*> [alg]
+runTests :: SomeAlgorithm -> Spec
+runTests sa = sequence_ $ tests <*> [sa]
 
-tests :: [Alg -> Spec]
+tests :: [SomeAlgorithm -> Spec]
 tests =
   [ basicTest
   , typTest
@@ -63,10 +59,10 @@ tests =
   , utfTest
   ]
 
-basicTest :: Alg -> Spec
-basicTest alg =
+basicTest :: SomeAlgorithm -> Spec
+basicTest sa =
   E.specify "basic"
-    $   mkTest Header { alg, typ = JWT } mempty
+    $   mkTest sa JWT mempty
     <$> jwtPayload
           (  withIssuer "libjwt-typed-test"
           <> withSubject "test"
@@ -76,10 +72,10 @@ basicTest alg =
           )
           ()
 
-typTest :: Alg -> Spec
-typTest alg =
+typTest :: SomeAlgorithm -> Spec
+typTest sa =
   E.specify "typ"
-    $   mkTest Header { alg, typ = Typ $ Just "jose" } mempty
+    $   mkTest sa (Typ $ Just "jose") mempty
     <$> jwtPayload
           (  withIssuer "libjwt-typed-test"
           <> withSubject "test-typ"
@@ -87,10 +83,10 @@ typTest alg =
           )
           ()
 
-audSingleTest :: Alg -> Spec
-audSingleTest alg =
+audSingleTest :: SomeAlgorithm -> Spec
+audSingleTest sa =
   E.specify "aud-single"
-    $   mkTest Header { alg, typ = JWT } mempty
+    $   mkTest sa JWT mempty
     <$> jwtPayload
           (  withIssuer "libjwt-typed-test"
           <> withSubject "test-aud-single"
@@ -98,10 +94,10 @@ audSingleTest alg =
           )
           ()
 
-audListTest :: Alg -> Spec
-audListTest alg =
+audListTest :: SomeAlgorithm -> Spec
+audListTest sa =
   E.specify "aud-list"
-    $   mkTest Header { alg, typ = JWT } mempty
+    $   mkTest sa JWT mempty
     <$> jwtPayload
           (  withIssuer "libjwt-typed-test"
           <> withSubject "test-aud-list"
@@ -111,11 +107,12 @@ audListTest alg =
           )
           ()
 
-privateClaimsSimpleTest :: Alg -> Spec
-privateClaimsSimpleTest alg =
+privateClaimsSimpleTest :: SomeAlgorithm -> Spec
+privateClaimsSimpleTest sa =
   E.specify "private-claims-simple"
     $   mkTest
-          Header { alg, typ = JWT }
+          sa
+          JWT
           (JWT.ClaimsMap $ Map.fromList
             [ ("name"   , JSON.String "John Doe")
             , ("userId" , JSON.Number 12345)
@@ -142,11 +139,12 @@ data ClaimObj = MkClaims { name :: String, userId :: Int, role :: Flag UserRole 
 instance ToPrivateClaims ClaimObj
 instance FromPrivateClaims ClaimObj
 
-privateClaimsComplexTest :: Alg -> Spec
-privateClaimsComplexTest alg =
+privateClaimsComplexTest :: SomeAlgorithm -> Spec
+privateClaimsComplexTest sa =
   E.specify "private-claims-complex"
     $   mkTest
-          Header { alg, typ = JWT }
+          sa
+          JWT
           (JWT.ClaimsMap $ Map.fromList
             [ ("name"  , JSON.String "John Doe")
             , ("userId", JSON.Number 12345)
@@ -162,11 +160,12 @@ privateClaimsComplexTest alg =
                    , role   = Flag RegularUser
                    }
 
-privateClaimsNsTest :: Alg -> Spec
-privateClaimsNsTest alg =
+privateClaimsNsTest :: SomeAlgorithm -> Spec
+privateClaimsNsTest sa =
   E.specify "private-claims-ns"
     $   mkTest
-          Header { alg, typ = JWT }
+          sa
+          JWT
           (JWT.ClaimsMap $ Map.fromList
             [ ("http://example.com/name"   , JSON.String "John Doe")
             , ("http://example.com/userId" , JSON.Number 12345)
@@ -187,11 +186,12 @@ privateClaimsNsTest alg =
             )
           )
 
-utfTest :: Alg -> Spec
-utfTest alg =
+utfTest :: SomeAlgorithm -> Spec
+utfTest sa =
   E.specify "utf"
     $   mkTest
-          Header { alg, typ = JWT }
+          sa
+          JWT
           (JWT.ClaimsMap $ Map.fromList
             [("name", JSON.String "孔子"), ("status", JSON.String "不患人之不己知，患不知人也")]
           )
@@ -201,28 +201,30 @@ utfTest alg =
 
 mkTest
   :: Encode (PrivateClaims cs ns)
-  => Header
+  => SomeAlgorithm
+  -> Typ
   -> JWT.ClaimsMap
   -> Payload cs ns
   -> Expectation
-mkTest outHeader expected payload =
-  let outJwt = Jwt { header = outHeader, payload }
-      token  = TE.decodeASCII $ getToken $ signJwt outJwt
-  in  expectDecodable token $ \unverifiedJwt -> do
-        expectHeader outHeader $ JWT.header unverifiedJwt
-        expectClaimsSet payload expected $ JWT.claims unverifiedJwt
-        case mkSigner $ alg outHeader of
-          Nothing -> pure ()
-          Just signer ->
-            maybe
-                (  expectationFailure
-                $  "Web.JWT: Unverifiable token\n"
-                ++ show token
-                ++ "\nheader:\n"
-                ++ show outHeader
-                )
-                (const $ pure ())
-              $ JWT.verify signer unverifiedJwt
+mkTest sa@(SomeAlgorithm a) typ expected payload =
+  expectDecodable token $ \unverifiedJwt -> do
+    expectHeader outHeader $ JWT.header unverifiedJwt
+    expectClaimsSet payload expected $ JWT.claims unverifiedJwt
+    case mkSigner sa of
+      Nothing -> expectationOk
+      Just signer ->
+        maybe
+            (  expectationFailure
+            $  "Web.JWT: Unverifiable token\n"
+            ++ show token
+            ++ "\nheader:\n"
+            ++ show outHeader
+            )
+            (const $ expectationOk)
+          $ JWT.verify signer unverifiedJwt
+ where
+  outHeader = Header { alg = toHeaderAlg a, typ }
+  token     = TE.decodeASCII $ getToken $ sign' typ a payload
 
 expectDecodable
   :: T.Text -> (JWT.JWT JWT.UnverifiedJWT -> Expectation) -> Expectation
@@ -242,9 +244,9 @@ expectHeader expected got =
   typ' JWT       = Just "JWT"
   typ' (Typ mbs) = TE.decodeUtf8 <$> mbs
 
-  alg' (HS256 _) = Just JWT.HS256
-  alg' (RS256 _) = Just JWT.RS256
-  alg' _         = Nothing
+  alg' HS256 = Just JWT.HS256
+  alg' RS256 = Just JWT.RS256
+  alg' _     = Nothing
 
 expectClaimsSet
   :: Payload cs ns -> JWT.ClaimsMap -> JWT.JWTClaimsSet -> Expectation
@@ -283,5 +285,4 @@ expectClaimsSet expected expectedUnreg got =
   iat' (Iat mnd) = numericDateToIntDate <$> mnd
 
   jti' (Jti muid) = stringToStringOrURI . UUID.toString <$> muid
-
 

@@ -70,6 +70,7 @@ import           Data.ByteString                ( ByteString
                                                 , useAsCString
                                                 , packCString
                                                 , packCStringLen
+                                                , null
                                                 )
 import           Data.ByteString.Unsafe         ( unsafePackMallocCString
                                                 , unsafeUseAsCStringLen
@@ -85,6 +86,8 @@ import           GHC.Exts
 
 import           System.IO.Unsafe               ( unsafePerformIO )
 
+import           Prelude                 hiding ( null )
+
 -- | IO restricted to calling /libjwt/ and /jsmn/
 newtype JwtIO a = JIO (IO a)
  deriving newtype (Functor, Applicative, Monad, MonadThrow, MonadCatch)
@@ -98,9 +101,9 @@ unsafePerformJwtIO (JIO io) = unsafePerformIO io
 mkJwtT :: JwtIO JwtT
 mkJwtT = JIO $ mkJwtT_ "jwt_new" c_jwt_new
 
-jwtDecode :: Maybe ByteString -> ByteString -> JwtIO JwtT
-jwtDecode maybeKey token = JIO
-  $ maybe ($ (nullPtr, 0)) unsafeUseAsCStringLen maybeKey doDecode
+jwtDecode :: ByteString -> ByteString -> JwtIO JwtT
+jwtDecode key token = JIO
+  $ (if null key then ($ (nullPtr, 0)) else unsafeUseAsCStringLen key) doDecode
  where
   doDecode (p_key, key_len) = useAsCString token $ \p_token ->
     mkJwtT_ "jwt_decode"

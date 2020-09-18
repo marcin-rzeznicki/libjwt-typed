@@ -19,7 +19,7 @@ module Libjwt.Jwt
   , Encoded
   , getToken
   , sign
-  , signJwt
+  , sign'
   , Decoded
   , getDecoded
   , decodeString
@@ -32,6 +32,7 @@ module Libjwt.Jwt
   )
 where
 
+import           Libjwt.Algorithms
 import           Libjwt.Encoding
 import           Libjwt.Exceptions              ( SomeDecodeException
                                                 , AlgorithmMismatch(..)
@@ -51,12 +52,12 @@ import           Control.Monad.Catch
 import           Control.Monad.Extra            ( unlessM )
 
 import           Control.Monad.Time
-import           Control.Monad                  ( (<=<) )
+import           Control.Monad                  ( (<=<)
+                                                , when
+                                                )
 
 import           Data.ByteString                ( ByteString )
 import qualified Data.ByteString.Char8         as C8
-
-import qualified Data.CaseInsensitive          as CI
 
 import           GHC.IO.Exception               ( IOErrorType(InvalidArgument) )
 
@@ -67,15 +68,12 @@ data Jwt pc ns = Jwt { header :: Header, payload :: Payload pc ns }
 deriving stock instance Show (PrivateClaims pc ns) => Show (Jwt pc ns)
 deriving stock instance Eq (PrivateClaims pc ns) => Eq (Jwt pc ns)
 
-instance Encode (PrivateClaims pc ns) => Encode (Jwt pc ns) where
-  encode Jwt { header, payload } jwt = encode payload jwt >> encode header jwt
-
 -- | base64url-encoded value of type @t@
 newtype Encoded t = MkEncoded { getToken :: ByteString -- ^ octets of the UTF-8 representation
                               }
   deriving stock (Show, Eq)
 
--- | Compute the encoded JWT value with the JWS Signature in the manner defined for the algorithm @alg@ .
+-- | Compute the encoded JWT value with the JWS Signature in the manner defined for the @algorithm@.
 --   'typ' of the JWT 'Header' is set to "JWT"
 --
 --   Creates the serialized ouput, that is: 
@@ -83,22 +81,43 @@ newtype Encoded t = MkEncoded { getToken :: ByteString -- ^ octets of the UTF-8 
 --   BASE64URL(UTF8(JWT Header)) || . || BASE64URL(JWT Payload) || . || BASE64URL(JWT Signature)
 --   @
 sign
-  :: Encode (PrivateClaims pc ns) => Alg -> Payload pc ns -> Encoded (Jwt pc ns)
-sign alg payload =
-  signJwt $ Jwt { header = Header { alg, typ = JWT }, payload }
+  :: (Encode (PrivateClaims pc ns), SigningKey k)
+  => Algorithm k -- ^ algorithm
+  -> Payload pc ns -- ^ JWT payload
+  -> Encoded (Jwt pc ns)
+sign = sign' JWT
 
--- | Compute the encoded JWT value with the JWS Signature in the manner defined for the algorithm 'alg' present in the JWT's 'header' .
+-- | Compute the encoded JWT value with the JWS Signature in the manner defined for the @algorithm@ .
+--   'typ' of the JWT 'Header' is set to @typ@
 --
 --   Creates the serialized ouput, that is: 
 --   @
 --   BASE64URL(UTF8(JWT Header)) || . || BASE64URL(JWT Payload) || . || BASE64URL(JWT Signature)
 --   @
-signJwt :: Encode (PrivateClaims pc ns) => Jwt pc ns -> Encoded (Jwt pc ns)
-signJwt it = MkEncoded $ unsafePerformJwtIO signTokenJwtIo
+sign'
+  :: (Encode (PrivateClaims pc ns), SigningKey k)
+  => Typ -- ^ typ
+  -> Algorithm k -- ^ algorithm
+  -> Payload pc ns -- ^ JWT payload
+  -> Encoded (Jwt pc ns)
+sign' ty algorithm = signJwt jwtAlg (getSigningKey key) ty
+  where (jwtAlg, key) = jwtAlgWithKey algorithm
+
+signJwt
+  :: Encode (PrivateClaims pc ns)
+  => JwtAlgT
+  -> ByteString
+  -> Typ
+  -> Payload pc ns
+  -> Encoded (Jwt pc ns)
+signJwt jwtAlg key ty it = MkEncoded $ unsafePerformJwtIO signTokenJwtIo
  where
   signTokenJwtIo = do
     jwt <- mkJwtT
     encode it jwt
+    encode ty jwt
+    jwtSetAlg jwtAlg key jwt
+    when (jwtAlg == jwtAlgNone && ty == JWT) $ addHeader "typ" "JWT" jwt
     jwtEncode jwt
 
 {-# NOINLINE signJwt #-}
@@ -109,17 +128,17 @@ newtype Decoded t = MkDecoded { getDecoded :: t }
 
 -- | See 'decodeByteString'
 decodeString
-  :: (MonadThrow m, Decode (PrivateClaims pc ns))
-  => Alg
+  :: (MonadThrow m, Decode (PrivateClaims pc ns), DecodingKey k)
+  => Algorithm k
   -> String
   -> m (Decoded (Jwt pc ns))
-decodeString alg = decodeByteString alg . C8.pack
+decodeString algorithm = decodeByteString algorithm . C8.pack
 
 -- | Parse the base64url-encoded representation to extract the serialized values for the components of the JWT.
 --   Verify that:
 --   
 --       (1) @token@ is a valid UTF-8 encoded representation of a completely valid JSON object,
---       (1) input JWT signature matches,
+--       (1) input JWT signature matches the @algorithm@,
 --       (1) the correct algorithm was used,
 --       (1) all required fields are present.
 --
@@ -127,61 +146,32 @@ decodeString alg = decodeByteString alg . C8.pack
 --   If step 3 fails, 'AlgorithmMismatch' will be thrown.
 --   If the last step fails, 'Libjwt.Exceptions.MissingClaim' will be thrown.
 decodeByteString
-  :: forall ns pc m
-   . (MonadThrow m, Decode (PrivateClaims pc ns))
-  => Alg
-  -> ByteString
+  :: forall ns pc m k
+   . (MonadThrow m, Decode (PrivateClaims pc ns), DecodingKey k)
+  => Algorithm k -- ^ algorithm used to verify the signature
+  -> ByteString -- ^ token
   -> m (Decoded (Jwt pc ns))
-decodeByteString alg token = either throwM (pure . MkDecoded)
+decodeByteString algorithm token = either throwM (pure . MkDecoded)
   $ unsafePerformJwtIO decodeTokenJwtIo
  where
   decodeTokenJwtIo :: JwtIO (Either SomeDecodeException (Jwt pc ns))
-  decodeTokenJwtIo = try $ do
-    jwt <- safeJwtDecode alg token
-    unlessM (matchAlg alg <$> jwtGetAlg jwt) $ throwM AlgorithmMismatch
-    Jwt <$> decodeHeader jwt <*> decode jwt
+  decodeTokenJwtIo =
+    let (jwtAlg, key) = jwtAlgWithKey algorithm
+    in  try $ do
+          jwt <- safeJwtDecode (getDecodingKey key) token
+          unlessM ((== jwtAlg) <$> jwtGetAlg jwt) $ throwM AlgorithmMismatch
+          Jwt <$> decode jwt <*> decode jwt
 
-  decodeHeader = fmap (Header alg) . decodeTyp
-
-  decodeTyp =
-    fmap
-        ( maybe (Typ Nothing)
-        $ \s -> if CI.mk s == "jwt" then JWT else Typ $ Just s
-        )
-      . getHeader "typ"
-
-  matchAlg (HS256 _) = (== jwtAlgHs256)
-  matchAlg (HS384 _) = (== jwtAlgHs384)
-  matchAlg (HS512 _) = (== jwtAlgHs512)
-  matchAlg (RS256 _) = (== jwtAlgRs256)
-  matchAlg (RS384 _) = (== jwtAlgRs384)
-  matchAlg (RS512 _) = (== jwtAlgRs512)
-  matchAlg (ES256 _) = (== jwtAlgEs256)
-  matchAlg (ES384 _) = (== jwtAlgEs384)
-  matchAlg (ES512 _) = (== jwtAlgEs512)
-  matchAlg None      = (== jwtAlgNone)
 
 {-# NOINLINE decodeByteString #-}
 
-safeJwtDecode :: Alg -> ByteString -> JwtIO JwtT
-safeJwtDecode alg token =
-  catchIf (\e -> ioeGetErrorType e == InvalidArgument)
-          (jwtDecode (getKey alg) token)
+safeJwtDecode :: ByteString -> ByteString -> JwtIO JwtT
+safeJwtDecode key token =
+  catchIf (\e -> ioeGetErrorType e == InvalidArgument) (jwtDecode key token)
     $ const
     $ throwM
     $ DecodeException
     $ C8.unpack token
- where
-  getKey (HS256 secret) = Just $ reveal secret
-  getKey (HS384 secret) = Just $ reveal secret
-  getKey (HS512 secret) = Just $ reveal secret
-  getKey (RS256 pem   ) = Just $ pubKey pem
-  getKey (RS384 pem   ) = Just $ pubKey pem
-  getKey (RS512 pem   ) = Just $ pubKey pem
-  getKey (ES256 pem   ) = Just $ ecPubKey pem
-  getKey (ES384 pem   ) = Just $ ecPubKey pem
-  getKey (ES512 pem   ) = Just $ ecPubKey pem
-  getKey None           = Nothing
 
 -- | Successfully validated value of type @t@
 newtype Validated t = MkValid { getValid :: t }
@@ -210,13 +200,14 @@ validateJwt settings v (MkDecoded jwt) =
 
 -- | See 'jwtFromByteString'
 jwtFromString
-  :: (Decode (PrivateClaims pc ns), MonadTime m, MonadThrow m)
+  :: (Decode (PrivateClaims pc ns), MonadTime m, MonadThrow m, DecodingKey k)
   => ValidationSettings
   -> JwtValidation pc ns
-  -> Alg
+  -> Algorithm k
   -> String
   -> m (ValidationNEL ValidationFailure (Validated (Jwt pc ns)))
-jwtFromString settings v alg = validateJwt settings v <=< decodeString alg
+jwtFromString settings v algorithm =
+  validateJwt settings v <=< decodeString algorithm
 
 -- | @jwtFromByteString = 'validateJwt' settings v <=< 'decodeByteString' alg@
 --
@@ -227,7 +218,7 @@ jwtFromString settings v alg = validateJwt settings v <=< decodeString alg
 --   
 --       (1) @token@ is a valid UTF-8 encoded representation of a completely valid JSON object,
 --       (1) input JWT signature matches,
---       (1) the correct algorithm was used,
+--       (1) the correct @algorithm@ was used,
 --       (1) all required fields are present.
 --
 --   If steps 1-2 are unuccessful, 'DecodeException' will be thrown.
@@ -248,12 +239,12 @@ jwtFromString settings v alg = validateJwt settings v <=< decodeString alg
 --
 --   'aud' claim is checked against 'appName'.
 jwtFromByteString
-  :: (Decode (PrivateClaims pc ns), MonadTime m, MonadThrow m)
+  :: (Decode (PrivateClaims pc ns), MonadTime m, MonadThrow m, DecodingKey k)
   => ValidationSettings -- ^ 'leeway' and 'appName'
   -> JwtValidation pc ns -- ^ additional validation rules 
-  -> Alg -- ^ algorithm used to verify the signature
+  -> Algorithm k -- ^ algorithm used to verify the signature
   -> ByteString -- ^ base64url-encoded representation (a token)
   -> m (ValidationNEL ValidationFailure (Validated (Jwt pc ns)))
-jwtFromByteString settings v alg =
-  validateJwt settings v <=< decodeByteString alg
+jwtFromByteString settings v algorithm =
+  validateJwt settings v <=< decodeByteString algorithm
 
