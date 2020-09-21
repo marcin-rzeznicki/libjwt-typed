@@ -134,12 +134,11 @@ privateClaimsSimpleTest sa =
           (mempty
             { JWT.iss = JWT.stringOrURI "libjwt-typed-test"
             , JWT.sub = JWT.stringOrURI "test-private-claims-simple"
-            , JWT.unregisteredClaims = (JWT.ClaimsMap $ Map.fromList
+            , JWT.unregisteredClaims = JWT.ClaimsMap $ Map.fromList
                                          [ ("name"   , JSON.String "John Doe")
                                          , ("userId" , JSON.Number 12345)
                                          , ("isAdmin", JSON.Bool False)
                                          ]
-                                       )
             }
           )
 
@@ -170,12 +169,11 @@ privateClaimsComplexTest sa =
           (mempty
             { JWT.iss = JWT.stringOrURI "libjwt-typed-test"
             , JWT.sub = JWT.stringOrURI "test-private-claims-complex"
-            , JWT.unregisteredClaims = (JWT.ClaimsMap $ Map.fromList
+            , JWT.unregisteredClaims = JWT.ClaimsMap $ Map.fromList
                                          [ ("name"  , JSON.String "John Doe")
                                          , ("userId", JSON.Number 12345)
                                          , ("role"  , JSON.String "regularUser")
                                          ]
-                                       )
             }
           )
 
