@@ -100,6 +100,22 @@ instance IsString Secret where
 data RsaKeyPair = FromRsaPem { privKey :: ByteString, pubKey :: ByteString }
   deriving stock (Show, Eq)
 
+-- | RSA public-key (/PEM-encoded/) used in /RSA/ algorithms for decoding
+--
+-- >
+-- >rsaPub =
+-- >  let public = C8.pack $ unlines
+-- >        [ "-----BEGIN PUBLIC KEY-----"
+-- >        , "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwCXp2P+qboao0tjUyU+D"
+-- >        , "3YI+sgBn8dkGaxOvPFLBFQMNkhbL0HEoRKNnQCubZNc0jXnMK5hCeGRnDS7lYclR"
+-- >        , "OXocRWUn5s2W3jP5xn7lM4otIpuE3FStthMCrPSEQiBCXE4cyKiHaZqmbqXlHAHV"
+-- >        , "EuGMM7oddiB6s3zjwf2h1v0SEiHf5ZFzTVarStablqh6wVDAiYyM+8aUM0x9p3Jc"
+-- >        , "aWW+eDk/UU3jCfCke7R3t2rbD1ZCj1cO08Uir3Lhf65TfU+iIrgLU3umV4B3gRcp"
+-- >        , "d8iz0ZTLaG8Qnm0GsPQjR3PTZYECxEnFaRgXcQLHYYMAW9YaX6T3rlTGZAaP5Ybo"
+-- >        , "xQIDAQAB"
+-- >        , "-----END PUBLIC KEY-----"
+-- >        ]
+-- >  in  FromRsaPub { rsaPublicKey = public }
 newtype RsaPubKey = FromRsaPub { rsaPublicKey :: ByteString }
   deriving stock (Show, Eq)
 
@@ -141,9 +157,21 @@ newtype RsaPubKey = FromRsaPub { rsaPublicKey :: ByteString }
 data EcKeyPair = FromEcPem { ecPrivKey :: ByteString, ecPubKey :: ByteString }
   deriving stock (Show, Eq)
 
+-- | Elliptic curve public key (/PEM-encoded/) used in /ECDSA/ algorithms for decoding
+--
+--
+-- > ecPub =
+-- >   let public = C8.pack $ unlines
+-- >         [ "-----BEGIN PUBLIC KEY-----"
+-- >         , "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEKZL0X84AvdnGZdsIdAS60OnvF3FN"
+-- >         , "lsrCnaXRoJUVdOYZldzb4po2uDXF5W58DS8C31fV+z+0lTG5RvuAqfkdbA=="
+-- >         , "-----END PUBLIC KEY-----"
+-- >         ]
+-- >   in  FromEcPub { ecPublicKey = public }
 newtype EcPubKey = FromEcPub { ecPublicKey :: ByteString }
   deriving stock (Show, Eq)
 
+-- | Class of keys that can be used (only) for decoding
 class DecodingKey k where
   getDecodingKey :: k -> ByteString
 
@@ -165,6 +193,7 @@ instance DecodingKey EcPubKey where
 instance DecodingKey () where
   getDecodingKey _ = ByteString.empty
 
+-- | Class of keys that can be used for signing
 class DecodingKey k => SigningKey k where
   getSigningKey :: k -> ByteString
 

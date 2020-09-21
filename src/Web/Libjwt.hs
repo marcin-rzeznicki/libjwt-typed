@@ -136,36 +136,36 @@ Signing is the process of transforming the 'Jwt' structure with 'Payload' and 'H
 
 To sign a token, you need to choose the algorithm. 
 
-+----------+---------------------------------------+
-|Algorithm |  Description                          | 
-+==========+=======================================+
-|'HS256'   |  HMAC with SHA-256                    |
-+----------+---------------------------------------+
-|'HS384'   |  HMAC with SHA-384                    |
-+----------+---------------------------------------+
-|'HS512'   |  HMAC with SHA-512                    |
-+----------+---------------------------------------+
-|'RS256'   |  RSASSA-PKCS1-v1_5 with SHA-256       |
-+----------+---------------------------------------+
-|'RS384'   |  RSASSA-PKCS1-v1_5 with SHA-384       |
-+----------+---------------------------------------+
-|'RS512'   |  RSASSA-PKCS1-v1_5 with SHA-512       |
-+----------+---------------------------------------+
-|'ES256'   |  ECDSA with curve P-256 and SHA-256   |
-+----------+---------------------------------------+
-|'ES384'   |  ECDSA with curve P-384 and SHA-384   |
-+----------+---------------------------------------+
-|'ES512'   |  ECDSA with curve P-521 and SHA-512   |
-+----------+---------------------------------------+
++------------+---------------------------------------+-------------+
+|Algorithm   |  Description                          |  Key type   |
++============+=======================================+=============+
+|'HMAC256'   |  HMAC with SHA-256                    |  'Secret'   |
++------------+---------------------------------------+             |
+|'HMAC384'   |  HMAC with SHA-384                    |             |
++------------+---------------------------------------+             |
+|'HMAC512'   |  HMAC with SHA-512                    |             |
++------------+---------------------------------------+-------------+
+|'RSA256'    |  RSASSA-PKCS1-v1_5 with SHA-256       | 'RsaKeyPair'|
++------------+---------------------------------------+ 'RsaPubKey' |
+|'RSA384'    |  RSASSA-PKCS1-v1_5 with SHA-384       |             |
++------------+---------------------------------------+             |
+|'RSA512'    |  RSASSA-PKCS1-v1_5 with SHA-512       |             |
++------------+---------------------------------------+-------------+
+|'ECDSA256'  |  ECDSA with curve P-256 and SHA-256   | 'EcKeyPair' |
++------------+---------------------------------------+ 'EcPubKey'  |
+|'ECDSA384'  |  ECDSA with curve P-384 and SHA-384   |             |
++------------+---------------------------------------+             |
+|'ECDSA512'  |  ECDSA with curve P-521 and SHA-512   |             |
++------------+---------------------------------------+-------------+
 
 The complete example: 
 
 @
 {-# LANGUAGE OverloadedStrings #-}
 
-hmac512 :: 'Alg'
+hmac512 :: 'Algorithm' 'Secret'
 hmac512 =
-    'HS512'
+    'HMAC512'
         "MjZkMDY2OWFiZmRjYTk5YjczZWFiZjYzMmRjMzU5NDYyMjMxODBjMTg3ZmY5OTZjM2NhM2NhN2Mx\\
         \\YzFiNDNlYjc4NTE1MjQxZGI0OWM1ZWI2ZDUyZmMzZDlhMmFiNjc5OWJlZTUxNjE2ZDRlYTNkYjU5\\
         \\Y2IwMDZhYWY1MjY1OTQgIC0K"

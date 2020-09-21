@@ -78,11 +78,11 @@ You must have `libjwt`  (preferrably the latest version) installed on your syste
 ```haskell
 {-# LANGUAGE OverloadedStrings #-}
 
-import Web.Libjwt ( Alg(HS512) )
+import Web.Libjwt
 
-hmac512 :: Alg
+hmac512 :: Algorithm Secret
 hmac512 =
-  HS512
+  HMAC512
     "MjZkMDY2OWFiZmRjYTk5YjczZWFiZjYzMmRjMzU5NDYyMjMxODBjMTg3ZmY5OTZjM2NhM2NhN2Mx\
     \YzFiNDNlYjc4NTE1MjQxZGI0OWM1ZWI2ZDUyZmMzZDlhMmFiNjc5OWJlZTUxNjE2ZDRlYTNkYjU5\
     \Y2IwMDZhYWY1MjY1OTQgIC0K"
@@ -96,10 +96,8 @@ A key of the same size as the hash output (for instance, 256 bits for
 Obtaining or reading keys is beyond the scope of this library. It accepts PEM-encoded RSA/ECDSA keys as `ByteString`s
 
 ```haskell
-import           Web.Libjwt                     ( Alg(..)
-                                                , EcKeyPair(..)
-                                                , RsaKeyPair(..)
-                                                )
+import           Web.Libjwt
+
 import qualified Data.ByteString.Char8         as C8
 
 rsa2048KeyPair :: RsaKeyPair
@@ -118,8 +116,8 @@ rsa2048KeyPair =
         ]
   in  FromRsaPem { privKey = private, pubKey = public }
 
-rs512 :: Alg
-rs512 = RS512 rsa2048KeyPair
+rsa512 :: Algorithm RsaKeyPair
+rsa512 = RSA512 rsa2048KeyPair
 
 ecP521KeyPair :: EcKeyPair
 ecP521KeyPair =
@@ -137,8 +135,8 @@ ecP521KeyPair =
         ]
   in  FromEcPem { ecPrivKey = private, ecPubKey = public }
 
-es512 :: Alg
-es512 = ES512 ecP521KeyPair
+ecdsa512 :: Algorithm EcKeyPair
+ecdsa512 = ECDSA512 ecP521KeyPair
 ```
 
 A key of size 2048 bits or larger MUST be used for RSA algorithms.
@@ -147,6 +145,28 @@ The [specification](https://tools.ietf.org/html/rfc7518) defines "the use of ECD
    the SHA-256 cryptographic hash function, ECDSA with the P-384 curve [secp384r1]
    and the SHA-384 hash function, and ECDSA with the P-521 curve [secp521r1] and the
    SHA-512 hash function."
+
+As of version **0.2**, you do not need private keys as long as you only decode tokens. This is obviously a type-safe feature, so you cannot pass a public-key to the signing function.
+Type system checks it for you.
+
+```haskell
+import           Web.Libjwt
+
+import qualified Data.ByteString.Char8         as C8
+
+rsaPub :: RsaPubKey
+rsaPub =
+  let public = C8.pack $ unlines
+        [ "-----BEGIN PUBLIC KEY-----"
+        , "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwCXp2P+qboao0tjUyU+D"
+        -- ...
+        , "-----END PUBLIC KEY-----"
+        ]
+  in  FromRsaPub { rsaPublicKey = public }
+
+rsa512 :: Algorithm RsaPubKey
+rsa512 = RSA512 rsaPub
+```
 
 ## Usage 
 
@@ -341,7 +361,7 @@ Success (MkValid {getValid = Jwt {header = Header {alg = HS512 (MkSecret {reveal
 
 ```
 
-JWT validation is monoid. You can append additional validations based on public and private claims, for example `checkIssuer "myApp" <> checkClaim (== True) #isRoot`. You will certainly like the fact that private claims' types are fullly known, so you can operate on type-safe Haskell values (`checkClaim ( > 0) #isRoot` will not compile). The `mempty` validation (the default validation) checks (according to [the rules in the RFC](https://tools.ietf.org/html/rfc7519#section-4.1) ) whether:
+JWT validation is a monoid. You can append additional validations based on public and private claims, for example `checkIssuer "myApp" <> checkClaim (== True) #isRoot`. You will certainly like the fact that private claims' types are fullly known, so you can operate on type-safe Haskell values (`checkClaim ( > 0) #isRoot` will not compile). The `mempty` validation (the default validation) checks (according to [the rules in the RFC](https://tools.ietf.org/html/rfc7519#section-4.1) ) whether:
 * token has not expired (`exp` claim),
 * token is ready to use (`nbf` claim),
 * token is intended for you (`aud` claim)
