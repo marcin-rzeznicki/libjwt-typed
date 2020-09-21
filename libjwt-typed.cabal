@@ -1,6 +1,6 @@
 cabal-version:       2.4
 name:                libjwt-typed
-version:             0.1
+version:             0.2
 synopsis:            A Haskell implementation of JSON Web Token (JWT)
 description:         A Haskell implementation of JSON Web Token (JWT)
                      .
