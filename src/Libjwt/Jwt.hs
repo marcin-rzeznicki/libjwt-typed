@@ -74,6 +74,7 @@ newtype Encoded t = MkEncoded { getToken :: ByteString -- ^ octets of the UTF-8 
 
 -- | Compute the encoded JWT value with the JWS Signature in the manner defined for the @algorithm@.
 --   'typ' of the JWT 'Header' is set to "JWT"
+--   'alg' of the JWT 'Header' is set according to the algorithm used (see 'toHeaderAlg')
 --
 --   Creates the serialized ouput, that is: 
 --   @
@@ -88,6 +89,7 @@ sign = sign' JWT
 
 -- | Compute the encoded JWT value with the JWS Signature in the manner defined for the @algorithm@ .
 --   'typ' of the JWT 'Header' is set to @typ@
+--   'alg' of the JWT 'Header' is set according to the algorithm used (see 'toHeaderAlg')
 --
 --   Creates the serialized ouput, that is: 
 --   @
