@@ -72,7 +72,6 @@ runTests sa = sequence_ $ tests <*> [sa]
 tests :: [SomeAlgorithm -> Spec]
 tests =
   [ basicTest
-  , typTest
   , richHeaderTest
   , audSingleTest
   , audListTest
@@ -91,18 +90,18 @@ basicTest sa =
   let joseHeader = JWT.JOSEHeader (Just "JWT") Nothing Nothing Nothing -- Web.JWT always replaces 'alg'
       cs         = mempty { JWT.iss = JWT.stringOrURI "libjwt-typed-test"
                           , JWT.sub = JWT.stringOrURI "test"
-                          , JWT.iat = JWT.numericDate 1595386660
-                          , JWT.nbf = JWT.numericDate 1595386660
+                          , JWT.iat = JWT.numericDate E.epochTime
+                          , JWT.nbf = JWT.numericDate E.epochTime
                           }
-  in  E.specify "basic" $ mkTest joseHeader cs sa nullClaims
-
-typTest :: SomeAlgorithm -> Spec
-typTest sa =
-  let joseHeader = JWT.JOSEHeader (Just "jose") Nothing Nothing Nothing
-      cs         = mempty { JWT.iss = JWT.stringOrURI "libjwt-typed-test"
-                          , JWT.sub = JWT.stringOrURI "test-typ"
-                          }
-  in  E.xspecify "typ" $ mkTest joseHeader cs sa nullClaims -- Web.JWT always uses JWT
+  in  E.specify "basic"
+        $   mkTest joseHeader cs sa
+        =<< jwtPayload
+              (  withIssuer "libjwt-typed-test"
+              <> withSubject "test"
+              <> issuedNow
+              <> notBeforeNow
+              )
+              ()
 
 richHeaderTest :: SomeAlgorithm -> Spec
 richHeaderTest sa =
@@ -111,29 +110,41 @@ richHeaderTest sa =
       cs = mempty { JWT.iss = JWT.stringOrURI "libjwt-typed-test"
                   , JWT.sub = JWT.stringOrURI "test-rich-header"
                   }
-  in  E.specify "rich-header" $ mkTest joseHeader cs sa nullClaims
+  in  E.specify "rich-header"
+        $   mkTest joseHeader cs sa
+        =<< jwtPayload
+              (withIssuer "libjwt-typed-test" <> withSubject "test-rich-header")
+              ()
 
 audSingleTest :: SomeAlgorithm -> Spec
 audSingleTest sa =
-  let joseHeader = JWT.JOSEHeader (Just "JWT") Nothing Nothing Nothing
-      cs         = mempty { JWT.iss = JWT.stringOrURI "libjwt-typed-test"
-                          , JWT.sub = JWT.stringOrURI "test-aud-single"
-                          , JWT.aud = Left <$> JWT.stringOrURI "nobody"
-                          }
-  in  E.specify "aud-single" $ mkTest joseHeader cs sa nullClaims
+  let cs = mempty { JWT.sub = JWT.stringOrURI "test-aud-single"
+                  , JWT.aud = Left <$> JWT.stringOrURI "nobody"
+                  }
+  in  E.specify "aud-single"
+        $   mkTest mempty cs sa
+        =<< jwtPayload
+              (withSubject "test-aud-single" <> withRecipient "nobody")
+              ()
 
 audListTest :: SomeAlgorithm -> Spec
 audListTest sa =
-  let joseHeader = JWT.JOSEHeader (Just "JWT") Nothing Nothing Nothing
-      cs         = mempty
-        { JWT.iss = JWT.stringOrURI "libjwt-typed-test"
-        , JWT.sub = JWT.stringOrURI "test-aud-list"
+  let cs = mempty
+        { JWT.sub = JWT.stringOrURI "test-aud-list"
         , JWT.aud = fmap Right
                     .   sequence
                     $   [JWT.stringOrURI]
                     <*> ["nobody-1", "nobody-2", "nobody-3"]
         }
-  in  E.specify "aud-list" $ mkTest joseHeader cs sa nullClaims
+  in  E.specify "aud-list"
+        $   mkTest mempty cs sa
+        =<< jwtPayload
+              (  withSubject "test-aud-list"
+              <> withRecipient "nobody-1"
+              <> withRecipient "nobody-2"
+              <> withRecipient "nobody-3"
+              )
+              ()
 
 data PreferredContact = Email | Phone
   deriving stock (Show, Eq, Generic)
@@ -143,10 +154,8 @@ instance AFlag PreferredContact
 unregisteredClaimsTest :: SomeAlgorithm -> Spec
 unregisteredClaimsTest sa =
   let
-    joseHeader = JWT.JOSEHeader (Just "JWT") Nothing Nothing Nothing
-    cs         = mempty
-      { JWT.iss                = JWT.stringOrURI "libjwt-typed-test"
-      , JWT.sub                = JWT.stringOrURI "test-unregistered"
+    cs = mempty
+      { JWT.sub                = JWT.stringOrURI "test-unregistered"
       , JWT.unregisteredClaims = JWT.ClaimsMap $ Map.fromList
         [ ("name"            , JSON.String "John Doe")
         , ("userId"          , JSON.Number 12345)
@@ -156,23 +165,21 @@ unregisteredClaimsTest sa =
         , ("createdAt"       , JSON.String "2020-07-31T11:45:00Z")
         ]
       }
-  in
-    E.specify "unregistered-claims" $ mkTest joseHeader cs sa $ toPrivateClaims
-      ( #name ->> ("John Doe" :: String)
-      , #userId ->> (12345 :: Int)
-      , #isAdmin ->> False
-      , #preferredContact ->> Flag Email
-      , #systemId ->> E.testJTI
-      , #createdAt ->> Just (read "2020-07-31 11:45:00 UTC" :: UTCTime)
-      )
+  in  E.specify "unregistered-claims" $ mkTest mempty cs sa =<< jwtPayload
+        (withSubject "test-unregistered")
+        ( #name ->> ("John Doe" :: String)
+        , #userId ->> (12345 :: Int)
+        , #isAdmin ->> False
+        , #preferredContact ->> Flag Email
+        , #systemId ->> E.testJTI
+        , #createdAt ->> Just (read "2020-07-31 11:45:00 UTC" :: UTCTime)
+        )
 
 unregisteredClaimsOptionsTest :: SomeAlgorithm -> Spec
 unregisteredClaimsOptionsTest sa =
   let
-    joseHeader = JWT.JOSEHeader (Just "JWT") Nothing Nothing Nothing
-    cs         = mempty
-      { JWT.iss                = JWT.stringOrURI "libjwt-typed-test"
-      , JWT.sub                = JWT.stringOrURI "test-unregistered-opt"
+    cs = mempty
+      { JWT.sub                = JWT.stringOrURI "test-unregistered-opt"
       , JWT.unregisteredClaims = JWT.ClaimsMap $ Map.fromList
                                    [ ("name", JSON.String "John Doe")
                                    , ("userId"          , JSON.Number 12345)
@@ -180,27 +187,25 @@ unregisteredClaimsOptionsTest sa =
                                    , ("preferredContact", JSON.String "email")
                                    ]
       }
-  in
-    E.specify "unregistered-claims-options"
-    $ mkTest joseHeader cs sa
-    $ toPrivateClaims
-        ( #name ->> ("John Doe" :: String)
-        , #userId ->> (12345 :: Int)
-        , #isAdmin ->> False
-        , #preferredContact ->> Just (Flag Email)
-        , #systemId ->> (Nothing :: Maybe UUID.UUID)
-        , #prefs ->> ([] :: [String])
-        )
+  in  E.specify "unregistered-claims-options"
+        $   mkTest mempty cs sa
+        =<< jwtPayload
+              (withSubject "test-unregistered-opt")
+              ( #name ->> ("John Doe" :: String)
+              , #userId ->> (12345 :: Int)
+              , #isAdmin ->> False
+              , #preferredContact ->> Just (Flag Email)
+              , #systemId ->> (Nothing :: Maybe UUID.UUID)
+              , #prefs ->> ([] :: [String])
+              )
 
 unregisteredClaimsNsTest :: SomeAlgorithm -> Spec
 unregisteredClaimsNsTest sa =
   let
-    joseHeader = JWT.JOSEHeader (Just "JWT") Nothing Nothing Nothing
-    cs         = mempty
-      { JWT.iss                = JWT.stringOrURI "libjwt-typed-test"
-      , JWT.sub                = JWT.stringOrURI "test-unregistered"
-      , JWT.iat                = JWT.numericDate 1595386660
-      , JWT.nbf                = JWT.numericDate 1595386660
+    cs = mempty
+      { JWT.sub                = JWT.stringOrURI "test-unregistered"
+      , JWT.iat                = JWT.numericDate E.epochTime
+      , JWT.nbf                = JWT.numericDate E.epochTime
       , JWT.unregisteredClaims = JWT.ClaimsMap $ Map.fromList
         [ ("http://example.com/name"    , JSON.String "John Doe")
         , ("http://example.com/userId"  , JSON.Number 12345)
@@ -208,42 +213,39 @@ unregisteredClaimsNsTest sa =
         , ("http://example.com/systemId", JSON.String $ UUID.toText E.testJTI)
         ]
       }
-  in
-    E.specify "unregistered-claims-ns"
-    $ mkTest joseHeader cs sa
-    $ toPrivateClaims
-    $ withNs
-        (Ns @"http://example.com")
-        ( #name ->> ("John Doe" :: String)
-        , #userId ->> (12345 :: Int)
-        , #isAdmin ->> False
-        , #systemId ->> E.testJTI
+  in  E.specify "unregistered-claims-ns" $ mkTest mempty cs sa =<< jwtPayload
+        (withSubject "test-unregistered" <> issuedNow <> notBeforeNow)
+        (withNs
+          (Ns @"http://example.com")
+          ( #name ->> ("John Doe" :: String)
+          , #userId ->> (12345 :: Int)
+          , #isAdmin ->> False
+          , #systemId ->> E.testJTI
+          )
         )
 
 utfTest :: SomeAlgorithm -> Spec
 utfTest sa =
-  let joseHeader = JWT.JOSEHeader (Just "JWT") Nothing Nothing Nothing
-      cs         = mempty
-        { JWT.iss                = JWT.stringOrURI "libjwt-typed-test"
-        , JWT.sub                = JWT.stringOrURI "test-utf"
+  let cs = mempty
+        { JWT.sub                = JWT.stringOrURI "test-utf"
         , JWT.unregisteredClaims = JWT.ClaimsMap $ Map.fromList
                                      [ ("name"  , JSON.String "孔子")
                                      , ("status", JSON.String "不患人之不己知，患不知人也")
                                      ]
         }
-  in  E.specify "utf" $ mkTest joseHeader cs sa $ toPrivateClaims
+  in  E.specify "utf" $ mkTest mempty cs sa =<< jwtPayload
+        (withSubject "test-utf")
         (#name ->> ("孔子" :: String), #status ->> ("不患人之不己知，患不知人也" :: T.Text))
 
 invalidClaimTest :: SomeAlgorithm -> Spec
 invalidClaimTest sa =
-  let joseHeader = JWT.JOSEHeader (Just "JWT") Nothing Nothing Nothing
-      cs         = mempty
+  let cs = mempty
         { JWT.iss                = JWT.stringOrURI "libjwt-typed-test"
         , JWT.sub                = JWT.stringOrURI "invalid-claim-test"
         , JWT.unregisteredClaims = JWT.ClaimsMap
                                      $ Map.singleton "not-a-number" JSON.Null
         }
-      token = jwtEncode cs joseHeader sa
+      token = jwtEncode cs mempty sa
   in  E.specify "invalid-claim"
         $       decodeTest @'["not-a-number" ->> Int] @ 'NoNs
                   sa
@@ -259,29 +261,22 @@ invalidClaimTest sa =
 
 invalidOptClaimTest :: SomeAlgorithm -> Spec
 invalidOptClaimTest sa =
-  let
-    joseHeader = JWT.JOSEHeader (Just "JWT") Nothing Nothing Nothing
-    cs         = mempty
-      { JWT.iss                = JWT.stringOrURI "libjwt-typed-test"
-      , JWT.sub                = JWT.stringOrURI "invalid-opt-claim-test"
-      , JWT.unregisteredClaims = JWT.ClaimsMap
-                                   $ Map.singleton "maybeNumber" JSON.Null
-      }
-  in
-    E.specify "invalid-opt-claim"
-    $   mkTest joseHeader cs sa
-    $   toPrivateClaims
-    $   #maybeNumber
-    ->> (Nothing :: Maybe Int)
+  let cs = mempty
+        { JWT.sub                = JWT.stringOrURI "invalid-opt-claim-test"
+        , JWT.unregisteredClaims = JWT.ClaimsMap
+                                     $ Map.singleton "maybeNumber" JSON.Null
+        }
+  in  E.specify "invalid-opt-claim" $ mkTest mempty cs sa =<< jwtPayload
+        (withSubject "invalid-opt-claim-test")
+        (#maybeNumber ->> (Nothing :: Maybe Int))
 
 validTokenTest :: SomeAlgorithm -> Spec
 validTokenTest sa =
   let
-    t0         = 1597945008
-    ttl        = 60
-    t1         = t0 + 30
-    joseHeader = JWT.JOSEHeader (Just "JWT") Nothing Nothing Nothing
-    cs         = mempty
+    t0  = 1597945008
+    ttl = 60
+    t1  = t0 + 30
+    cs  = mempty
       { JWT.iss                = JWT.stringOrURI "libjwt-typed-test"
       , JWT.sub                = JWT.stringOrURI "valid-token-test"
       , JWT.iat                = JWT.numericDate t0
@@ -294,7 +289,7 @@ validTokenTest sa =
     E.specifyWithTime t1 "valid-token"
     $ validationTest @'["number" ->> Int] @ 'NoNs
         sa
-        (jwtEncode cs joseHeader sa)
+        (jwtEncode cs mempty sa)
         (  checkAge 3600
         <> checkIssuer "libjwt-typed-test"
         <> checkSubject "valid-token-test"
@@ -307,11 +302,10 @@ validTokenTest sa =
 invalidTokenTest :: SomeAlgorithm -> Spec
 invalidTokenTest sa =
   let
-    t0         = 1597945008
-    ttl        = 60
-    t1         = t0 + 120
-    joseHeader = JWT.JOSEHeader (Just "JWT") Nothing Nothing Nothing
-    cs         = mempty
+    t0  = 1597945008
+    ttl = 60
+    t1  = t0 + 120
+    cs  = mempty
       { JWT.iss                = JWT.stringOrURI "libjwt-typed-test"
       , JWT.sub                = JWT.stringOrURI "invalid-token-test"
       , JWT.iat                = JWT.numericDate t0
@@ -324,7 +318,7 @@ invalidTokenTest sa =
     E.specifyWithTime t1 "invalid-token"
     $ validationTest @'["number" ->> Int] @ 'NoNs
         sa
-        (jwtEncode cs joseHeader sa)
+        (jwtEncode cs mempty sa)
         (  checkAge 3600
         <> checkIssuer "libjwt-typed-test"
         <> checkSubject "valid-token-test"
@@ -345,22 +339,24 @@ mkTest
   => JWT.JOSEHeader
   -> JWT.JWTClaimsSet
   -> SomeAlgorithm
-  -> PrivateClaims cs ns
+  -> Payload cs ns
   -> E.TestEnv Expectation
 mkTest inHeader inClaims sa expected =
   let token = jwtEncode inClaims inHeader sa
-  in  handle (handleDecodeException token) $ decodeTest sa token $ \jwt -> do
-        expectHeader inHeader $ header jwt
-        expectPayload inClaims (payload jwt) expected
+  in  handle (handleDecodeException token) $ decodeTest sa token $ \actual ->
+        actual `shouldBe` expected
 
 decodeTest
   :: Decode (PrivateClaims pc ns)
   => SomeAlgorithm
   -> T.Text
-  -> (Jwt pc ns -> Expectation)
+  -> (Payload pc ns -> Expectation)
   -> E.TestEnv Expectation
 decodeTest (SomeAlgorithm a) token test =
-  fmap (test . getDecoded) $ E.MkTest $ decodeByteString a $ TE.encodeUtf8 token
+  fmap (test . payload . getDecoded)
+    $ E.MkTest
+    $ decodeByteString a
+    $ TE.encodeUtf8 token
 
 validationTest
   :: Decode (PrivateClaims pc ns)
@@ -385,76 +381,8 @@ jwtEncode inClaims inHeader =
 
 handleDecodeException :: T.Text -> SomeDecodeException -> E.TestEnv Expectation
 handleDecodeException token e =
-  pure
-    $  expectationFailure
+  E.fail
     $  "Web.JWT: Decoding token\n"
     ++ show token
     ++ "\n\tthrew exception:\n"
     ++ show e
-
-expectHeader :: JWT.JOSEHeader -> Header -> Expectation
-expectHeader expected got = typ got `shouldBe` typ' (JWT.typ expected)
-  -- mkJWTAlgorithm (alg got) `shouldBe` JWT.alg expected
-
-
-
-
-
-
-
-
-
-
-
-
-
-
- where
-  typ' Nothing      = Typ Nothing
-  typ' (Just "JWT") = JWT
-  typ' (Just "jwt") = JWT
-  typ' (Just text ) = Typ $ Just $ TE.encodeUtf8 text
-
-  -- mkJWTAlgorithm None  = Nothing
-  -- mkJWTAlgorithm HS256 = Just JWT.HS256
-  -- mkJWTAlgorithm RS256 = Just JWT.RS256
-  -- mkJWTAlgorithm _     = error "Unsupported algorithm"
-
-
-expectPayload
-  :: (Show (PrivateClaims cs ns), Eq (PrivateClaims cs ns))
-  => JWT.JWTClaimsSet
-  -> Payload cs ns
-  -> PrivateClaims cs ns
-  -> Expectation
-expectPayload expected got expectedPc = got `shouldBe` ClaimsSet
-  { iss           = iss' (JWT.iss expected)
-  , sub           = sub' (JWT.sub expected)
-  , aud           = aud' (JWT.aud expected)
-  , exp           = exp' (JWT.exp expected)
-  , iat           = iat' (JWT.iat expected)
-  , nbf           = nbf' (JWT.nbf expected)
-  , jti           = jti' (JWT.jti expected)
-  , privateClaims = expectedPc
-  }
- where
-  stringOrURIToString  = T.unpack . JWT.stringOrURIToText
-
-  intDateToNumericDate = fromPOSIX . JWT.secondsSinceEpoch
-
-  iss' mt = Iss $ stringOrURIToString <$> mt
-
-  sub' mt = Sub $ stringOrURIToString <$> mt
-
-  aud' Nothing           = mempty
-  aud' (Just (Left  s )) = Aud [stringOrURIToString s]
-  aud' (Just (Right ss)) = Aud $ map stringOrURIToString ss
-
-  exp' md = Exp $ intDateToNumericDate <$> md
-
-  iat' md = Iat $ intDateToNumericDate <$> md
-
-  nbf' md = Nbf $ intDateToNumericDate <$> md
-
-  jti' mt = Jti $ UUID.fromText . JWT.stringOrURIToText =<< mt
-
