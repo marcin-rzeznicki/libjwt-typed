@@ -447,7 +447,7 @@ Full result sets (graphical HTML reports) are available [here](https://github.co
 
 Code can be found [here](https://github.com/marcin-rzeznicki/libjwt-typed/tree/master/bench). Benchmarking is undoubtedly hard - if you think something can be improved, please make a PR.
 
-The Benchmarks compare `libjwt-typed` to `jose` in different hopefully real-world use cases. All the results below were obtained on a 6-Core Intel Core i7-9750H; 32 GB RAM; GHC 8.10.1 (compiled with -O2; RTS options: -N -ki2k -A512m -n32m); libjwt built with GnuTLS using GCC 10.2.0
+The Benchmarks compare `libjwt-typed` to `jose` in different hopefully real-world use cases. All the results below were obtained on a 6-Core Intel Core i7-9750H; 32 GB RAM; GHC 8.10.2 (compiled with -O2; RTS options: -N -ki2k -A512m -n32m); libjwt built with GnuTLS using GCC 10.2.0
 
 ### Signing
 
@@ -467,7 +467,7 @@ When signing an "empty" token using `SHA-512` i.e. something like
 
 | what  |          libjwt          |         jose         | speedup |
 | :---: | :----------------------: | :------------------: | :-----: |
-| mean  | **9.05 μs**   (± 278 ns) | 166 μs   (± 5.74 μs) |   18x   |
+| mean  | **9.05 μs**   (± 277 ns) | 163 μs   (± 5.39 μs) |   18x   |
 
 For more complex tokens i.e. something like
 ```json
@@ -491,31 +491,31 @@ For more complex tokens i.e. something like
 }
 ```
 
-| what  |          libjwt           |         jose         | speedup |
-| :---: | :-----------------------: | :------------------: | :-----: |
-| mean  | **35.4 μs**   (± 89.9 ns) | 525 μs   (± 9.94 μs) |   14x   |
+| what  |          libjwt          |         jose         | speedup |
+| :---: | :----------------------: | :------------------: | :-----: |
+| mean  | **35.3 μs**   (± 111 ns) | 521 μs   (± 9.45 μs) |   14x   |
 
 
 When signing using elliptic-curve cryptography: `ECDSA256` 
 
 |      what      |          libjwt          |         jose          | speedup |
 | :------------: | :----------------------: | :-------------------: | :-----: |
-| mean (simple)  | **77.3 μs**   (± 833 ns) | 1.18 ms   (± 21.6 μs) |   15x   |
-| mean (complex) | **112 μs**   (± 1.17 μs) | 1.54 ms   (± 22.0 μs) |   13x   |
+| mean (simple)  | **76.8 μs**   (± 296 ns) | 1.16 ms   (±  7.5 μs) |   15x   |
+| mean (complex) | **111 μs**    (± 495 ns) | 1.53 ms   (± 12.4 μs) |   13x   |
 
 and `ECDSA512`
 
 |      what      |          libjwt          |         jose          | speedup |
 | :------------: | :----------------------: | :-------------------: | :-----: |
-| mean (simple)  | **270 μs**   (± 4.74 μs) | 3.94 ms   (± 40.7 μs) |   14x   |
-| mean (complex) | **305 μs**   (± 4.19 μs) | 4.31 ms   (± 55.5 μs) |   14x   |
+| mean (simple)  | **266 μs**   (± 1.22 μs) | 3.92 ms   (± 27.8 μs) |   14x   |
+| mean (complex) | **300 μs**   (± 831 ns)  | 4.25 ms   (± 24.1 μs) |   14x   |
 
 And finally using the `RSA (RSASSA-PKCS1-v1_5 using SHA-512)`
 
 |      what      |        libjwt         |           jose            | speedup |
 | :------------: | :-------------------: | :-----------------------: | :-----: |
-| mean (simple)  | 1.40 ms   (± 13.2 μs) | **1.03 ms**   (± 11.9 μs) |  0.7x   |
-| mean (complex) | 1.44 ms   (± 15.0 μs) | **1.37 ms**   (± 15.8 μs) |  0.9x   |
+| mean (simple)  | 1.39 ms   (± 4.83 μs) | **1.03 ms**   (± 7.86 μs) |  0.7x   |
+| mean (complex) | 1.42 ms   (± 6.70 μs) | **1.39 ms**   (± 12.3 μs) |  0.9x   |
 
 This is the only time `jose` is faster (congrats!). `libjwt-typed` is slower probably because it doesn't store private key parameters. This is something thaht needs to be improved.
 
@@ -527,29 +527,29 @@ Using `HMAC512`
 
 |      what      |          libjwt          |         jose         | speedup |
 | :------------: | :----------------------: | :------------------: | :-----: |
-| mean (simple)  | **9.29 μs**   (± 143 ns) | 128 μs   (± 3.40 μs) |   13x   |
-| mean (complex) | **60.0 μs**   (± 691 ns) | 390 μs   (± 6.12 μs) |   6x    |
+| mean (simple)  | **9.23 μs**   (± 134 ns) | 128 μs   (± 2.54 μs) |   13x   |
+| mean (complex) | **63.3 μs**   (± 736 ns) | 391 μs   (± 5.84 μs) |   6x    |
 
 Using `ECDSA256`
 
-|      what      |          libjwt          |         jose          | speedup |
-| :------------: | :----------------------: | :-------------------: | :-----: |
-| mean (simple)  | **189 μs**   (± 1.49 μs) | 1.26 ms   (± 14.4 μs) |   6x    |
-| mean (complex) | **244 μs**   (± 3.14 μs) | 1.54 ms   (± 15.4 μs) |   6x    |
+|      what      |         libjwt          |         jose          | speedup |
+| :------------: | :---------------------: | :-------------------: | :-----: |
+| mean (simple)  | **187 μs**   (± 551 ns) | 1.24 ms   (± 8.54 μs) |   6x    |
+| mean (complex) | **241 μs**   (± 578 ns) | 1.52 ms   (± 6.50 μs) |   6x    |
 
 Using `ECDSA512`
 
 |      what      |          libjwt          |         jose          | speedup |
 | :------------: | :----------------------: | :-------------------: | :-----: |
-| mean (simple)  | **749 μs**   (± 8.66 μs) | 4.45 ms   (± 75.4 μs) |   5x    |
-| mean (complex) | **804 μs**   (± 9.67 μs) | 4.71 ms   (± 53.8 μs) |   5x    |
+| mean (simple)  | **746 μs**   (± 2.78 μs) | 4.40 ms   (± 12.3 μs) |   5x    |
+| mean (complex) | **797 μs**   (± 1.67 μs) | 4.78 ms   (± 28.2 μs) |   6x    |
 
 And finally `RSA`
 
 |      what      |          libjwt          |         jose         | speedup |
 | :------------: | :----------------------: | :------------------: | :-----: |
-| mean (simple)  | **39.4 μs**   (± 618 ns) | 138 μs   (± 3.23 μs) |   3x    |
-| mean (complex) | **93.5 μs**   (± 777 ns) | 399 μs   (± 6.33 μs) |   4x    |
+| mean (simple)  | **39.3 μs**   (± 170 ns) | 137 μs   (± 2.97 μs) |   3x    |
+| mean (complex) | **97.3 μs**   (± 503 ns) | 398 μs   (± 5.58 μs) |   4x    |
 
 ## Not implemented
 
