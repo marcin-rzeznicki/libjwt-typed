@@ -46,9 +46,25 @@ import qualified Web.JWT                       as JWT
 
 spec :: Spec
 spec = do
+  testAlgValidation
   describe "HS256" $ runTests hmac256
   describe "none" $ runTests none
   describe "RS256" $ runTests rsa256
+
+testAlgValidation :: Spec
+testAlgValidation =
+  let maliciousSigner = JWT.HMACSecret $ getDecodingKey E.testRsa2048KeyPair
+      token = TE.encodeUtf8 $ JWT.encodeSigned maliciousSigner mempty mempty
+  in  E.specify "alg-validation"
+        $       fmap
+                  (  const
+                  $  expectationFailure
+                  $  "Web.JWT: unexpectedly decoded token\n"
+                  ++ show token
+                  )
+                  (decodeByteString @ 'NoNs @Empty (RSA256 E.testRsa2048KeyPair) token
+                  )
+        `catch` (\AlgorithmMismatch -> E.pass)
 
 runTests :: SomeAlgorithm -> Spec
 runTests sa = sequence_ $ tests <*> [sa]
@@ -379,6 +395,19 @@ handleDecodeException token e =
 expectHeader :: JWT.JOSEHeader -> Header -> Expectation
 expectHeader expected got = typ got `shouldBe` typ' (JWT.typ expected)
   -- mkJWTAlgorithm (alg got) `shouldBe` JWT.alg expected
+
+
+
+
+
+
+
+
+
+
+
+
+
 
  where
   typ' Nothing      = Typ Nothing
