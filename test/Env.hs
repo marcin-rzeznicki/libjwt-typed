@@ -24,9 +24,12 @@ import qualified Data.ByteString.Char8         as C8
 
 import           Data.Either.Extra              ( fromEither )
 
-import           Data.Time.Clock                ( UTCTime )
+import           Data.Time.Clock                ( UTCTime
+                                                , NominalDiffTime
+                                                )
 import           Data.Time.Clock.POSIX          ( POSIXTime
                                                 , posixSecondsToUTCTime
+                                                , utcTimeToPOSIXSeconds
                                                 )
 
 import           Data.UUID                      ( UUID )
@@ -152,8 +155,20 @@ expectationOk = pure ()
 pass :: TestEnv Expectation
 pass = MkTest (pure expectationOk)
 
+fail :: String -> TestEnv Expectation
+fail reason = MkTest (pure $ expectationFailure reason)
+
+withTime :: (UTCTime -> a) -> TestEnv a
+withTime f = f <$> currentTime
+
+withEpochTime :: (POSIXTime -> a) -> TestEnv a
+withEpochTime f = withTime (f . utcTimeToPOSIXSeconds)
+
+epochTime :: NominalDiffTime
+epochTime = 1595386660
+
 presetTime :: UTCTime
-presetTime = posixSecondsToUTCTime 1595386660
+presetTime = posixSecondsToUTCTime epochTime
 
 runTestWithPresetTime :: TestEnv a -> Either SomeException a
 runTestWithPresetTime = runTestWithGivenTime presetTime
