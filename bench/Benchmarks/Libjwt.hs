@@ -6,7 +6,8 @@
 {-# LANGUAGE TypeOperators #-}
 
 module Benchmarks.Libjwt
-  ( signing, decoding
+  ( signing
+  , decoding
   )
 where
 
@@ -36,20 +37,11 @@ import           Data.UUID                      ( UUID )
 import           Prelude                 hiding ( exp )
 
 signing :: SigningKey k => [Algorithm k -> Benchmark]
-signing =
-  [ signSimple
-  , signCustomClaims
-  , signWithNs
-  , signComplexCustomClaims
-  ]
+signing = [signSimple, signCustomClaims, signWithNs, signComplexCustomClaims]
 
 decoding :: SigningKey k => [Algorithm k -> Benchmark]
 decoding =
-  [ decodeSimple
-  , decodeCustomClaims
-  , decodeWithNs
-  , decodeComplexCustomClaims
-  ]
+  [decodeSimple, decodeCustomClaims, decodeWithNs, decodeComplexCustomClaims]
 
 basePayload :: BenchEnv -> Payload Empty 'NoNs
 basePayload LocalEnv {..} = def { iss = Iss (Just "benchmarks")
@@ -84,17 +76,12 @@ decodeSimple a =
   benchmark = jwtFromByteString validationSettings (checkIssuer "benchmarks") a
 
 
+type CustomClaims
+  = '["userName" ->> Text, "isRoot" ->> Bool, "clientId" ->> UUID, "created" ->> UTCTime, "scope" ->> Flag Scope]
 
-type CustomJwt
-  = Jwt
-      '["userName" ->> Text, "isRoot" ->> Bool, "clientId" ->> UUID, "created" ->> UTCTime, "scope" ->> Flag Scope]
-      'NoNs
+type CustomJwt = Jwt CustomClaims 'NoNs
 
-customPayload :: BenchEnv
-                   -> Payload
-                        '["userName" ->> Text, "isRoot" ->> Bool, "clientId" ->> UUID,
-                          "created" ->> UTCTime, "scope" ->> Flag Scope]
-                        'NoNs
+customPayload :: BenchEnv -> Payload CustomClaims 'NoNs
 customPayload e@LocalEnv {..} = (basePayload e)
   { privateClaims = toPrivateClaims
                       ( #userName ->> shortPrintableText
@@ -122,15 +109,10 @@ decodeCustomClaims a =
 
 
 type CustomJwtWithNs
-  = Jwt
-      '["userName" ->> Text, "isRoot" ->> Bool, "clientId" ->> UUID, "created" ->> UTCTime, "scope" ->> Flag Scope]
-      ( 'SomeNs "https://www.example.com/test")
+  = Jwt CustomClaims ( 'SomeNs "https://www.example.com/test")
 
-customPayloadWithNs :: BenchEnv
-                         -> Payload
-                              '["userName" ->> Text, "isRoot" ->> Bool, "clientId" ->> UUID,
-                                "created" ->> UTCTime, "scope" ->> Flag Scope]
-                              ('SomeNs "https://www.example.com/test")
+customPayloadWithNs
+  :: BenchEnv -> Payload CustomClaims ( 'SomeNs "https://www.example.com/test")
 customPayloadWithNs e@LocalEnv {..} = (basePayload e)
   { privateClaims = toPrivateClaims $ withNs
                       (Ns @"https://www.example.com/test")
@@ -158,18 +140,12 @@ decodeWithNs a =
   benchmark = jwtFromByteString validationSettings (checkIssuer "benchmarks") a
 
 
+type ComplexClaims
+  = '["user_name" ->> Text, "is_root" ->> Bool, "client_id" ->> UUID, "created" ->> UTCTime, "accounts" ->> NonEmpty (UUID, Text), "scopes" ->> [Flag Scope], "emails" ->> [String]]
 
-type ComplexJwt
-  = Jwt
-      '["user_name" ->> Text, "is_root" ->> Bool, "client_id" ->> UUID, "created" ->> UTCTime, "accounts" ->> NonEmpty (UUID, Text), "scopes" ->> [Flag Scope], "emails" ->> [String]]
-      'NoNs
+type ComplexJwt = Jwt ComplexClaims 'NoNs
 
-complexPayload :: BenchEnv
-                    -> Payload
-                         '["user_name" ->> Text, "is_root" ->> Bool, "client_id" ->> UUID,
-                           "created" ->> UTCTime, "accounts" ->> NonEmpty (UUID, Text),
-                           "scopes" ->> [Flag Scope], "emails" ->> [String]]
-                         'NoNs
+complexPayload :: BenchEnv -> Payload ComplexClaims 'NoNs
 complexPayload e@LocalEnv {..} = (basePayload e)
   { privateClaims = toPrivateClaims
                       ( #user_name ->> shortPrintableText
