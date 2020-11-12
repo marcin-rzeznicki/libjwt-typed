@@ -24,11 +24,8 @@ cabal.project.local
 *.dump-*
 # Stack
 .stack-work/
-stack.yaml.lock
-stack.local.yaml
-stack.local.yaml.lock
-stack.nightly.local.yaml
-stack.nightly.local.yaml.lock
+stack.*.lock
+stack*.local.yaml
 
 ### IDE/support
 # Vim
@@ -59,4 +56,4 @@ TAGS
 
 # other
 .DS_Store
-fix-linking.sh
+fix-linking*.sh
