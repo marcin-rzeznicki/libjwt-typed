@@ -12,7 +12,7 @@ cache:
 
 matrix:
   include:
-  - env: GHCVER=8.8.3 STACK_YAML="$TRAVIS_BUILD_DIR/stack.yaml"
+  - env: GHCVER=8.8.3 STACK_YAML="$TRAVIS_BUILD_DIR/stack-8.8.3.yaml"
     addons:
       apt:
         sources:
@@ -21,13 +21,13 @@ matrix:
         - ghc-8.8.3   
         - libjansson-dev
         - libssl-dev
-  - env: GHCVER=8.10.2 STACK_YAML="$TRAVIS_BUILD_DIR/stack.nightly.yaml"
+  - env: GHCVER=8.10.3 STACK_YAML="$TRAVIS_BUILD_DIR/stack.yaml"
     addons:
       apt:
         sources:
         - sourceline: "ppa:hvr/ghc"
         packages:
-        - ghc-8.10.2
+        - ghc-8.10.3
         - libjansson-dev
         - libssl-dev 
         
