@@ -149,13 +149,13 @@ unsafeAddGrantBool p_grant =
 
 addGrantInt64 :: String -> Int64 -> JwtT -> JwtIO ()
 addGrantInt64 grant =
-  coerce . _addGrant "jwt_add_grant_int" c_jwt_add_grant_int grant . coerce
+  coerce . _addGrant "jwt_add_grant_int" c_jwt_add_grant_int grant . (fromIntegral :: Int64 -> CLong)
 
 unsafeAddGrantInt64 :: Addr# -> Int64 -> JwtT -> JwtIO ()
 unsafeAddGrantInt64 p_grant =
   coerce
     . _unsafeAddGrant "jwt_add_grant_int" c_jwt_add_grant_int p_grant
-    . coerce
+    . (fromIntegral :: Int64 -> CLong)
 
 addGrantInt :: String -> Int -> JwtT -> JwtIO ()
 addGrantInt grant =
@@ -258,14 +258,14 @@ unsafeGetGrantBool p_grant (JwtT pjwt_t) =
 getGrantInt64 :: String -> JwtT -> JwtIO (Maybe Int64)
 getGrantInt64 grant (JwtT pjwt_t) = JIO $ withForeignPtr pjwt_t $ \jwt ->
   withCAString grant
-    $ coerce
+    $ fmap (fmap fromIntegral)
     . throwErrnoOrNoEnt "jwt_get_grant_int"
     . c_jwt_get_grant_int jwt
 
 unsafeGetGrantInt64 :: Addr# -> JwtT -> JwtIO (Maybe Int64)
 unsafeGetGrantInt64 p_grant (JwtT pjwt_t) =
   JIO $ withForeignPtr pjwt_t $ \jwt ->
-    coerce
+    fmap (fmap fromIntegral)
       . throwErrnoOrNoEnt "jwt_get_grant_int"
       . c_jwt_get_grant_int jwt
       $ Ptr p_grant
