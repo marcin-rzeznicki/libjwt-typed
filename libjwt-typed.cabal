@@ -119,8 +119,6 @@ library
   cc-options:          -DJSMN_STATIC 
                        -DJSMN_PARENT_LINKS 
                        -DJSMN_STRICT 
-                       -march=native 
-                       -mtune=native 
                        -O2 
                        -fno-plt
   include-dirs:        src/cbits/jsmn
