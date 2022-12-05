@@ -81,7 +81,7 @@ import           Data.HashMap.Lazy              ( HashMap
                                                 )
 import qualified Data.HashMap.Lazy             as HashMap
 
-import           Data.Kind
+import           Data.Kind                      ( Constraint, Type )
 
 import           Data.Proxied                   ( selNameProxied )
 
