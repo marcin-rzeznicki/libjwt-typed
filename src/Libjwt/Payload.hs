@@ -52,6 +52,7 @@ import           Data.Function                  ( (&) )
 import           Data.Monoid
 
 import           Data.Time.Clock
+import           Data.Time.Clock.POSIX
 
 import           Data.UUID                      ( UUID )
 
@@ -195,7 +196,13 @@ step = JwtBuilder . Ap . pure . Endo
 stepWithCurrentTime
   :: (NumericDate -> Payload any1 any2 -> Payload any1 any2)
   -> JwtBuilder any1 any2
-stepWithCurrentTime f = JwtBuilder . Ap $ fmap (Endo . f) now
+stepWithCurrentTime f = JwtBuilder . Ap $ fmap (Endo . f) askEpoch
+  where
+    askEpoch = do
+      utcTime <- ask
+      let posixTime = utcTimeToPOSIXSeconds utcTime
+      let secondsSinceEpoch = nominalDiffTimeToSeconds posixTime
+      pure $ NumericDate $ round secondsSinceEpoch
 
 -- | Set /iss/ claim
 withIssuer :: String -> JwtBuilder any1 any2
